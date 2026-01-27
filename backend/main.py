@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db, engine
 from models import Base, User, CharacterStats, UsageLog
 from schemas import UserCreate, SyncResponse, UsageLogCreate
+import schemas
 from game_logic import calculate_xp_and_stats
 import models
 
@@ -11,7 +12,17 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Idle Hero API")
 
-@app.post("/user/onboard", response_model=UserCreate)
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/user/onboard", response_model=schemas.User)
 def onboard(user: UserCreate, db: Session = Depends(get_db)):
     db_user = models.User(username=user.username, email=user.email)
     db.add(db_user)
@@ -21,7 +32,7 @@ def onboard(user: UserCreate, db: Session = Depends(get_db)):
     stats = models.CharacterStats(user_id=db_user.id)
     db.add(stats)
     db.commit()
-    return user
+    return db_user
 
 @app.post("/sync/usage/{user_id}", response_model=SyncResponse)
 def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(get_db)):

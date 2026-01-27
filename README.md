@@ -14,18 +14,18 @@ The system follows a standard client-server architecture with an asynchronous AI
 
 ```mermaid
 graph TD
-    User[Mobile App (React Native/Flutter)] -->|Usage Data Loop| API[Backend API (FastAPI)]
+    User["Mobile App (React Native/Flutter)"] -->|Usage Data Loop| API["Backend API (FastAPI)"]
     API -->|Store Data| DB[(PostgreSQL)]
     
     subgraph AI Service
-    API -->|Trigger Analysis| AI[AI Logic Module]
+    API -->|Trigger Analysis| AI["AI Logic Module"]
     AI -->|Fetch History| DB
     AI -->|Generate Insights| DB
     end
 
     subgraph "OS Integration"
-    User -->|Usage Stats API| And[Android UsageStatsManager]
-    User -->|Screen Time API| iOS[iOS ScreenTime API]
+    User -->|Usage Stats API| And["Android UsageStatsManager"]
+    User -->|Screen Time API| iOS["iOS ScreenTime API"]
     end
 ```
 

@@ -1,10 +1,21 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db, engine
-from models import Base, User, CharacterStats, UsageLog
-from schemas import UserCreate, SyncResponse, UsageLogCreate
+from models import Base, User, CharacterStats, UsageLog, BossEnemy, Kingdom, Building
+from schemas import (
+    UserCreate, SyncResponse, UsageLogCreate, 
+    BossStatus, BattleSummary, SyncResponseWithBattle,
+    Kingdom as KingdomSchema, BuildRequest, KingdomSyncResult, SyncResponseWithKingdom
+)
 import schemas
-from game_logic import calculate_xp_and_stats
+from game_logic import (
+    calculate_xp_and_stats, 
+    generate_daily_boss, 
+    get_todays_boss, 
+    calculate_battle_outcome,
+    collect_resources,
+    construct_building
+)
 import models
 
 # Create tables
@@ -22,25 +33,83 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# =====================
+# USER ENDPOINTS
+# =====================
+
 @app.post("/user/onboard", response_model=schemas.User)
 def onboard(user: UserCreate, db: Session = Depends(get_db)):
+    """Create a new user and initialize their stats and kingdom."""
     db_user = models.User(username=user.username, email=user.email)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    # Init stats
+    # Init stats with combat defaults
     stats = models.CharacterStats(user_id=db_user.id)
     db.add(stats)
+    # Init kingdom
+    kingdom = models.Kingdom(user_id=db_user.id, name=f"{user.username}'s Kingdom")
+    db.add(kingdom)
     db.commit()
     return db_user
 
-@app.post("/sync/usage/{user_id}", response_model=SyncResponse)
+
+@app.get("/user/profile/{user_id}", response_model=schemas.UserProfile)
+def get_profile(user_id: str, db: Session = Depends(get_db)):
+    """Get user profile with stats and rules."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+# =====================
+# BOSS BATTLE ENDPOINTS
+# =====================
+
+@app.get("/game/boss/{user_id}", response_model=BossStatus)
+def get_boss(user_id: str, db: Session = Depends(get_db)):
+    """
+    Get today's boss for the user.
+    If no boss exists for today, generate a new one.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Try to get existing boss
+    boss = get_todays_boss(db, user_id)
+    
+    # If no boss, generate new one
+    if not boss:
+        boss = generate_daily_boss(db, user)
+    
+    return boss
+
+
+# =====================
+# SYNC ENDPOINT (with Battle + Kingdom)
+# =====================
+
+@app.post("/sync/usage/{user_id}", response_model=SyncResponseWithKingdom)
 def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(get_db)):
+    """
+    Sync usage logs and calculate battle outcome + kingdom resources.
+    
+    This endpoint:
+    1. Saves usage logs
+    2. Gets or creates today's boss
+    3. Calculates battle outcome
+    4. Collects kingdom resources
+    5. Checks for disasters
+    6. Returns battle + kingdom summary
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Get current stats
+    # Get or create stats
     stats = user.stats
     if not stats:
         stats = models.CharacterStats(user_id=user.id)
@@ -57,33 +126,77 @@ def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(g
         )
         db.add(db_log)
     
-    # Calculate rewards
-    xp, leveled_up, new_stats = calculate_xp_and_stats(stats, logs, user.rules)
+    # Calculate time metrics
+    total_screen_seconds = sum(log.duration_seconds for log in logs)
+    total_screen_minutes = total_screen_seconds / 60
+    assumed_waking_minutes = 480  # 8 hours
+    focus_minutes = max(0, assumed_waking_minutes - total_screen_minutes)
+    
+    # --- BOSS BATTLE LOGIC ---
+    boss = get_todays_boss(db, user_id)
+    if not boss:
+        boss = generate_daily_boss(db, user)
+    
+    battle_summary = None
+    if not boss.is_defeated:
+        battle_result = calculate_battle_outcome(stats, logs, boss)
+        battle_summary = BattleSummary(**battle_result)
+        
+        if battle_result["boss_defeated"]:
+            insight = f"🎉 Victory! You defeated {boss.name}! +{battle_result['xp_gained']} XP!"
+        elif battle_result["player_hp_remaining"] <= 20:
+            insight = f"⚠️ Warning! Your hero is getting weak. {boss.name} is winning!"
+        else:
+            insight = f"⚔️ Battle in progress. {boss.name} HP: {battle_result['boss_hp_remaining']}/{boss.total_hp}"
+    else:
+        xp, leveled_up, _ = calculate_xp_and_stats(stats, logs, user.rules)
+        insight = "✨ Today's boss already defeated! Enjoy your victory."
+    
+    # --- KINGDOM RESOURCE COLLECTION ---
+    kingdom_result = None
+    kingdom = user.kingdom
+    if kingdom:
+        resource_result = collect_resources(
+            focus_minutes=focus_minutes,
+            screen_time_minutes=total_screen_minutes,
+            kingdom=kingdom,
+            buildings=list(kingdom.buildings)
+        )
+        kingdom_result = KingdomSyncResult(**resource_result)
+        
+        # Add kingdom info to insight
+        if resource_result["disaster_occurred"]:
+            insight += f" ⚠️ Disaster! {resource_result['damaged_building']} was damaged!"
+        insight += f" 🪵+{resource_result['wood_gained']} 🪨+{resource_result['stone_gained']}"
+    
     db.commit()
     
     return {
-        "xp_gained": xp,
-        "level_up": leveled_up,
-        "new_stats": new_stats,
-        "insight": "Great job! Your focus is improving." # Stub AI
+        "xp_gained": battle_summary.xp_gained if battle_summary else xp,
+        "level_up": battle_summary.level_up if battle_summary else leveled_up,
+        "new_stats": stats,
+        "insight": insight,
+        "battle": battle_summary,
+        "kingdom": kingdom_result
     }
 
-@app.get("/user/profile/{user_id}", response_model=schemas.UserProfile)
-def get_profile(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+
+# =====================
+# RULES ENDPOINTS
+# =====================
 
 @app.get("/rules/{user_id}", response_model=list[schemas.DetoxRule])
 def get_rules(user_id: str, db: Session = Depends(get_db)):
+    """Get all detox rules for a user."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.rules
 
+
 @app.post("/rules/{user_id}", response_model=schemas.DetoxRule)
 def create_rule(user_id: str, rule: schemas.DetoxRuleCreate, db: Session = Depends(get_db)):
+    """Create a new detox rule for a user."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -99,3 +212,57 @@ def create_rule(user_id: str, rule: schemas.DetoxRuleCreate, db: Session = Depen
     db.commit()
     db.refresh(db_rule)
     return db_rule
+
+
+# =====================
+# KINGDOM ENDPOINTS
+# =====================
+
+@app.get("/kingdom/{user_id}", response_model=KingdomSchema)
+def get_kingdom(user_id: str, db: Session = Depends(get_db)):
+    """Get the user's kingdom with all buildings."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    kingdom = user.kingdom
+    if not kingdom:
+        # Auto-create kingdom if missing (for existing users)
+        kingdom = models.Kingdom(user_id=user_id, name=f"{user.username}'s Kingdom")
+        db.add(kingdom)
+        db.commit()
+        db.refresh(kingdom)
+    
+    return kingdom
+
+
+@app.post("/kingdom/build/{user_id}", response_model=KingdomSchema)
+def build_structure(user_id: str, request: BuildRequest, db: Session = Depends(get_db)):
+    """Construct a new building in the kingdom."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    kingdom = user.kingdom
+    if not kingdom:
+        raise HTTPException(status_code=404, detail="Kingdom not found. Call GET /kingdom first.")
+    
+    # Attempt to construct
+    success, message = construct_building(kingdom, request.building_type)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    # Create building record
+    new_building = models.Building(
+        kingdom_id=kingdom.id,
+        type=request.building_type,
+        level=1,
+        health=100
+    )
+    db.add(new_building)
+    db.commit()
+    db.refresh(kingdom)
+    
+    return kingdom
+

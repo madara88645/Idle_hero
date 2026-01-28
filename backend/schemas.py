@@ -16,6 +16,20 @@ class User(UserBase):
     class Config:
         orm_mode = True
 
+# Hero Class Schemas
+class HeroClassBase(BaseModel):
+    name: str
+    bonus_type: str
+    description: Optional[str] = None
+
+class HeroClass(HeroClassBase):
+    id: str
+    class Config:
+        orm_mode = True
+
+class ClassSelectRequest(BaseModel):
+    class_id: str
+
 # Stats Schemas
 class CharacterStats(BaseModel):
     level: int
@@ -24,8 +38,25 @@ class CharacterStats(BaseModel):
     discipline: int
     energy: int
     willpower: int
+    class_id: Optional[str] = None
+    skill_points: int = 0
     class Config:
         orm_mode = True
+
+# Skill Schemas
+class Skill(BaseModel):
+    code: str
+    cost: int
+    description: str
+    unlocked: bool = False
+
+class SkillUnlockRequest(BaseModel):
+    skill_code: str
+
+class SkillUnlockResponse(BaseModel):
+    success: bool
+    message: str
+    remaining_points: int
 
 # Rule Schemas
 class DetoxRuleBase(BaseModel):
@@ -59,3 +90,79 @@ class SyncResponse(BaseModel):
 class UserProfile(User):
     stats: Optional[CharacterStats] = None
     rules: List[DetoxRule] = []
+
+
+# Boss Battle Schemas
+class BossStatus(BaseModel):
+    """Current boss status for GET /game/boss"""
+    id: str
+    name: str
+    total_hp: int
+    current_hp: int
+    damage_dealt_to_user: int
+    is_defeated: bool
+    class Config:
+        orm_mode = True
+
+
+class BattleSummary(BaseModel):
+    """Battle result summary included in sync response"""
+    player_damage_dealt: int
+    boss_damage_dealt: int
+    boss_hp_remaining: int
+    player_hp_remaining: int
+    boss_defeated: bool
+    xp_gained: int
+    level_up: bool
+    boss_name: str
+
+
+class SyncResponseWithBattle(BaseModel):
+    """Extended sync response with battle summary"""
+    xp_gained: int
+    level_up: bool
+    new_stats: CharacterStats
+    insight: Optional[str] = None
+    battle: Optional[BattleSummary] = None
+
+
+# Kingdom Schemas
+class Building(BaseModel):
+    id: str
+    type: str
+    level: int
+    health: int
+    class Config:
+        orm_mode = True
+
+
+class Kingdom(BaseModel):
+    id: str
+    name: str
+    wood: int
+    stone: int
+    gold: int
+    buildings: List[Building] = []
+    class Config:
+        orm_mode = True
+
+
+class BuildRequest(BaseModel):
+    building_type: str
+
+
+class KingdomSyncResult(BaseModel):
+    wood_gained: int
+    stone_gained: int
+    disaster_occurred: bool
+    damaged_building: Optional[str] = None
+
+
+class SyncResponseWithKingdom(BaseModel):
+    """Extended sync response with kingdom resources"""
+    xp_gained: int
+    level_up: bool
+    new_stats: CharacterStats
+    insight: Optional[str] = None
+    battle: Optional[BattleSummary] = None
+    kingdom: Optional[KingdomSyncResult] = None

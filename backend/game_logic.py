@@ -160,3 +160,92 @@ def calculate_xp_and_stats(current_stats: StatsModel, logs: list[UsageLogCreate]
         return xp_gained, True, current_stats
         
     return xp_gained, False, current_stats
+
+
+# =====================================================================
+# KINGDOM RESOURCE MANAGEMENT
+# =====================================================================
+
+# Building costs: (wood, stone)
+BUILDING_COSTS = {
+    "Library": (50, 30),
+    "Barracks": (80, 50),
+    "Mine": (100, 80),
+}
+
+
+def collect_resources(
+    focus_minutes: float,
+    screen_time_minutes: float,
+    kingdom,
+    buildings: list
+) -> dict:
+    """
+    Convert focus time into resources and check for disasters.
+    
+    Args:
+        focus_minutes: Minutes NOT spent on tracked apps
+        screen_time_minutes: Minutes spent on tracked apps
+        kingdom: Kingdom model instance
+        buildings: List of Building model instances
+    
+    Returns:
+        dict with wood_gained, stone_gained, disaster_occurred, damaged_building
+    """
+    # Resource calculation
+    wood_gained = int(focus_minutes * 1)
+    stone_gained = int(focus_minutes * 0.5)
+    
+    # Update kingdom resources
+    kingdom.wood += wood_gained
+    kingdom.stone += stone_gained
+    
+    # Disaster check
+    disaster_occurred = False
+    damaged_building = None
+    
+    if buildings:
+        disaster_chance = screen_time_minutes / 100.0
+        if random.random() < disaster_chance:
+            disaster_occurred = True
+            # Pick a random building to damage
+            target_building = random.choice(buildings)
+            target_building.health = max(0, target_building.health - 20)
+            damaged_building = target_building.type
+    
+    return {
+        "wood_gained": wood_gained,
+        "stone_gained": stone_gained,
+        "disaster_occurred": disaster_occurred,
+        "damaged_building": damaged_building
+    }
+
+
+def construct_building(kingdom, building_type: str) -> Tuple[bool, str]:
+    """
+    Attempt to construct a building in the kingdom.
+    
+    Args:
+        kingdom: Kingdom model instance
+        building_type: Type of building to construct
+    
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    if building_type not in BUILDING_COSTS:
+        return False, f"Unknown building type: {building_type}"
+    
+    wood_cost, stone_cost = BUILDING_COSTS[building_type]
+    
+    if kingdom.wood < wood_cost:
+        return False, f"Not enough wood. Need {wood_cost}, have {kingdom.wood}"
+    
+    if kingdom.stone < stone_cost:
+        return False, f"Not enough stone. Need {stone_cost}, have {kingdom.stone}"
+    
+    # Deduct resources
+    kingdom.wood -= wood_cost
+    kingdom.stone -= stone_cost
+    
+    return True, f"Successfully constructed {building_type}"
+

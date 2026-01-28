@@ -77,7 +77,14 @@ const DashboardScreen = ({ navigation, route }) => {
             </View>
 
             <Button title="Sync Usage" onPress={handleSync} />
+            <View style={{ height: 10 }} />
             <Button title="Manage Rules" onPress={() => navigation.navigate('Rules', { userId })} />
+            <View style={{ height: 10 }} />
+            <Button title="My Kingdom" onPress={() => navigation.navigate('Kingdom', { userId })} color="#8D6E63" />
+            <View style={{ height: 10 }} />
+            <Button title="Boss Battle" onPress={() => navigation.navigate('BossBattle', { userId })} color="#D32F2F" />
+            <View style={{ height: 10 }} />
+            <Button title="My Profile" onPress={() => navigation.navigate('Profile', { userId })} color="#1976D2" />
         </ScrollView>
     );
 };

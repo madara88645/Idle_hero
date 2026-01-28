@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DashboardScreen = ({ navigation, route }) => {
     const insets = useSafeAreaInsets();
-    const userId = route.params?.userId || 'default-user-id'; // Simplified
+    // Use state for userId so we can update it after onboarding
+    const [currentUserId, setCurrentUserId] = useState(route.params?.userId || 'default-user-id');
     const [profile, setProfile] = useState(null);
 
     const fetchProfile = async () => {
         try {
-            console.log("Fetching profile for:", userId);
-            const res = await api.get(`/user/profile/${userId}`);
+            console.log("Fetching profile for:", currentUserId);
+            const res = await api.get(`/user/profile/${currentUserId}`);
             setProfile(res.data);
         } catch (err) {
             console.error("Fetch profile error:", err);
@@ -25,12 +26,11 @@ const DashboardScreen = ({ navigation, route }) => {
                     };
                     const onboardRes = await api.post('/user/onboard', newUser);
                     console.log("Onboarded new user:", onboardRes.data);
-                    // Update the route param or local state to use the new ID
-                    // Since we can't easily change route params, we'll just re-fetch with new ID
-                    // But wait, the component uses `userId` from route.params
-                    // We need to handle this. For now, let's just use the new data directly
+
+                    // Update state with new user ID
+                    const newId = onboardRes.data.id;
+                    setCurrentUserId(newId);
                     setProfile(onboardRes.data);
-                    // Ideally we should update the navigation params or global store
                 } catch (onboardErr) {
                     console.error("Onboard error:", onboardErr);
                 }
@@ -53,7 +53,7 @@ const DashboardScreen = ({ navigation, route }) => {
             const logs = [
                 { app_package_name: 'com.instagram.android', start_time: new Date().toISOString(), end_time: new Date().toISOString(), duration_seconds: 600 }
             ];
-            const res = await api.post(`/sync/usage/${userId}`, logs);
+            const res = await api.post(`/sync/usage/${currentUserId}`, logs);
             alert(res.data.insight);
             fetchProfile();
         } catch (err) {
@@ -76,8 +76,8 @@ const DashboardScreen = ({ navigation, route }) => {
                 <Text>Focus: {stats?.focus}</Text>
             </View>
 
-            <Button title="Sync Usage" onPress={handleSync} />
-            <Button title="Manage Rules" onPress={() => navigation.navigate('Rules', { userId })} />
+            <Button title="Sync Usage" onPress={handleSync} color="#8A2BE2" />
+            <Button title="Manage Rules" onPress={() => navigation.navigate('Rules', { userId: currentUserId })} color="#8A2BE2" />
         </ScrollView>
     );
 };

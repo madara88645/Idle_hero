@@ -29,6 +29,7 @@ class CharacterStats(Base):
     discipline = Column(Integer, default=10)
     energy = Column(Integer, default=100)
     willpower = Column(Integer, default=10)
+    last_sync_time = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="stats")
 

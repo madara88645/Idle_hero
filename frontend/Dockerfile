@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
+RUN npx expo install react-dom react-native-web typescript @types/react
 
 COPY . .
 

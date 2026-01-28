@@ -58,14 +58,14 @@ def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(g
         db.add(db_log)
     
     # Calculate rewards
-    xp, leveled_up, new_stats = calculate_xp_and_stats(stats, logs, user.rules)
+    xp, leveled_up, new_stats, message = calculate_xp_and_stats(stats, logs, user.rules)
     db.commit()
     
     return {
         "xp_gained": xp,
         "level_up": leveled_up,
         "new_stats": new_stats,
-        "insight": "Great job! Your focus is improving." # Stub AI
+        "insight": message
     }
 
 @app.get("/user/profile/{user_id}", response_model=schemas.UserProfile)

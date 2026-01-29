@@ -236,6 +236,9 @@ def get_kingdom(user_id: str, db: Session = Depends(get_db)):
     return kingdom
 
 
+
+
+
 @app.post("/kingdom/build/{user_id}", response_model=KingdomSchema)
 def build_structure(user_id: str, request: BuildRequest, db: Session = Depends(get_db)):
     """Construct a new building in the kingdom."""
@@ -265,4 +268,75 @@ def build_structure(user_id: str, request: BuildRequest, db: Session = Depends(g
     db.refresh(kingdom)
     
     return kingdom
+
+
+# =====================
+# HERO CLASS ENDPOINTS
+# =====================
+
+def seed_classes(db: Session):
+    """Seed initial hero classes if they don't exist."""
+    existing_classes = db.query(models.HeroClass).count()
+    if existing_classes > 0:
+        return
+
+    classes = [
+        models.HeroClass(
+            name="Night Owl",
+            bonus_type=models.ClassBonusType.NIGHT_OWL,
+            description="Less focus penalty late at night (22:00-04:00)."
+        ),
+        models.HeroClass(
+            name="Morning Star",
+            bonus_type=models.ClassBonusType.MORNING_STAR,
+            description="Bonus XP for morning focus sessions (06:00-12:00)."
+        ),
+        models.HeroClass(
+            name="Hardcore",
+            bonus_type=models.ClassBonusType.HARDCORE,
+            description="High Risk/Reward: 2x XP gain, but 3x penalty for distractions."
+        ),
+        models.HeroClass(
+            name="Balanced",
+            bonus_type=models.ClassBonusType.BALANCED,
+            description="Standard progression with no modifiers."
+        )
+    ]
+    db.add_all(classes)
+    db.commit()
+
+
+@app.on_event("startup")
+def startup_event():
+    db = next(get_db())
+    seed_classes(db)
+
+
+@app.get("/classes", response_model=list[schemas.HeroClass])
+def get_classes(db: Session = Depends(get_db)):
+    """Get list of available hero classes."""
+    return db.query(models.HeroClass).all()
+
+
+@app.post("/user/{user_id}/class/{class_id}", response_model=schemas.CharacterStats)
+def select_class(user_id: str, class_id: str, db: Session = Depends(get_db)):
+    """Assign a hero class to a user."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    hero_class = db.query(models.HeroClass).filter(models.HeroClass.id == class_id).first()
+    if not hero_class:
+        raise HTTPException(status_code=404, detail="Hero Class not found")
+        
+    if not user.stats:
+        user.stats = models.CharacterStats(user_id=user.id)
+        db.add(user.stats)
+    
+    # Update class
+    user.stats.class_id = class_id
+    db.commit()
+    db.refresh(user.stats)
+    
+    return user.stats
 

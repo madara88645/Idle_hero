@@ -67,6 +67,15 @@ const ProfileScreen = ({ route }) => {
                     <Text style={styles.emptyText}>No skills unlocked yet.</Text>
                 )}
             </View>
+
+            <TouchableOpacity
+                style={styles.changeClassButton}
+                onPress={() => navigation.navigate('ClassSelection', { userId })}
+            >
+                <Text style={styles.changeClassText}>⚡ Change Hero Class</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: 30 }} />
         </ScrollView>
     );
 };
@@ -94,7 +103,9 @@ const styles = StyleSheet.create({
     skillCard: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#eee', marginBottom: 5 },
     skillName: { fontSize: 16, fontWeight: '600' },
     skillDate: { fontSize: 12, color: '#888' },
-    emptyText: { color: '#999', fontStyle: 'italic' }
+    emptyText: { color: '#999', fontStyle: 'italic' },
+    changeClassButton: { backgroundColor: '#1976D2', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20, marginHorizontal: 20 },
+    changeClassText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
 
 export default ProfileScreen;

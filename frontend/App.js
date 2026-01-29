@@ -8,6 +8,7 @@ import RulesScreen from './src/screens/RulesScreen';
 import KingdomScreen from './src/screens/KingdomScreen';
 import BossBattleScreen from './src/screens/BossBattleScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import ClassSelectionScreen from './src/screens/ClassSelectionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +22,7 @@ export default function App() {
           <Stack.Screen name="Kingdom" component={KingdomScreen} />
           <Stack.Screen name="BossBattle" component={BossBattleScreen} options={{ title: 'Boss Battle' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} options={{ title: 'Choose Class', headerLeft: null }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

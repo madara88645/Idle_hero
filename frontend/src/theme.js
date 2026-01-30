@@ -9,7 +9,12 @@ export const theme = {
         gold: '#FFD700',
         danger: '#FF4444',
         success: '#4CAF50',
-        cardBorder: '#2A2A40'
+        cardBorder: '#2A2A40',
+        hubCastle: '#2E7D32', // Green/Safe
+        hubBoss: '#C62828',   // Red/Danger
+        hubMarket: '#FF8F00', // Orange/Trade
+        hubTown: '#1565C0',    // Blue/Civic
+        sky: '#0D1117'        // Very dark blue for sky
     },
     spacing: {
         s: 8,

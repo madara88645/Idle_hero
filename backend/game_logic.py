@@ -73,22 +73,30 @@ def get_todays_boss(db: Session, user_id: str) -> Optional[BossEnemy]:
 def calculate_battle_outcome(
     stats: StatsModel, 
     logs: list[UsageLogCreate], 
-    boss: BossEnemy
+    boss: BossEnemy,
+    rules: list
 ) -> dict:
     """
     Calculate the battle outcome based on usage logs.
     
-    - Focus Time (time NOT using apps) = Damage to Boss
-    - Screen Time (time using blocked apps) = Damage to Player (from Boss)
+    - Focus Time (time NOT using BLOCKED apps) = Damage to Boss
+    - Screen Time (time using BLOCKED apps) = Damage to Player (from Boss)
     
     Returns a dict with battle summary.
     """
-    # Calculate total screen time from logs
-    total_screen_seconds = sum(log.duration_seconds for log in logs)
-    total_screen_minutes = total_screen_seconds / 60
+    # 1. Identify Blocked Packages
+    blocked_packages = {r.app_package_name for r in rules if r.is_blocked}
     
-    # Assume 8 hours of waking time (480 minutes) minus screen time = focus time
-    # This is a simplification; real implementation would use actual data
+    # 2. Filter logs: Only count blocked apps as "Screen Time" (Damage)
+    # Neutral apps (not in list or not blocked) do not count as screen time.
+    screen_time_seconds = sum(
+        log.duration_seconds for log in logs 
+        if log.app_package_name in blocked_packages
+    )
+    total_screen_minutes = screen_time_seconds / 60
+    
+    # Assume 8 hours of waking time (480 minutes)
+    # Focus Time = Waking Time - Blocked Screen Time
     assumed_waking_minutes = 480
     focus_minutes = max(0, assumed_waking_minutes - total_screen_minutes)
     

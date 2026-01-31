@@ -139,7 +139,7 @@ def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(g
     
     battle_summary = None
     if not boss.is_defeated:
-        battle_result = calculate_battle_outcome(stats, logs, boss)
+        battle_result = calculate_battle_outcome(stats, logs, boss, user.rules)
         battle_summary = BattleSummary(**battle_result)
         
         if battle_result["boss_defeated"]:

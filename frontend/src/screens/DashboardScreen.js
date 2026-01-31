@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme, commonStyles } from '../theme';
 import HeroAvatar from '../components/HeroAvatar';
 import FloatingText from '../components/FloatingText';
+import UsageStatsService from '../services/UsageStatsService';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -93,9 +94,9 @@ const DashboardScreen = ({ navigation, route }) => {
 
     const handleSync = async () => {
         try {
-            const logs = [
-                { app_package_name: 'com.instagram.android', start_time: new Date().toISOString(), end_time: new Date().toISOString(), duration_seconds: 600 }
-            ];
+            // Get Usage Logs (Mock or Real)
+            const logs = await UsageStatsService.getTodayUsage();
+            console.log("Syncing Logs:", logs);
 
             // Optimistic feedback before API call
             addFloatingText("Syncing...", 100, 400);

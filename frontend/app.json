@@ -26,6 +26,9 @@
         "android.permission.FOREGROUND_SERVICE"
       ]
     },
+    "plugins": [
+      "./plugins/withUsageStats"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }

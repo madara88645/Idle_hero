@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import MyUsageStats from '../../modules/my-usage-stats';
 
 /**
  * Service to abstract Usage Stats logic.
@@ -20,23 +21,27 @@ const MOCK_LOGS = [
     }
 ];
 
+
+
 const UsageStatsService = {
     /**
      * Checks if the app has permission to access usage stats.
-     * In Expo Go, always returns true (simulated).
      */
     hasPermission: async () => {
         if (Constants.appOwnership === 'expo') {
             console.log("[UsageStatsService] Running in Expo Go. Permission simulated.");
             return true;
         }
-        // TODO: Implement Native Module check here
-        return false;
+        try {
+            return await MyUsageStats.hasPermission();
+        } catch (e) {
+            console.error("Native Module Error:", e);
+            return false;
+        }
     },
 
     /**
      * Gets usage stats for today.
-     * In Expo Go, returns mock data.
      */
     getTodayUsage: async () => {
         if (Constants.appOwnership === 'expo') {
@@ -44,8 +49,33 @@ const UsageStatsService = {
             return MOCK_LOGS;
         }
 
-        // TODO: Call Native Module here
-        return [];
+        try {
+            console.log("Fetching native usage stats...");
+            // Get stats for last 1 day
+            const statsMap = await MyUsageStats.getUsageStats(1);
+            console.log("Native Stats Raw:", statsMap);
+
+            // Transform map { "com.pkg": durationMillis } -> Array of UsageLog objects
+            const logs = Object.entries(statsMap).map(([pkg, durationMillis]) => {
+                const durationSeconds = Math.floor(durationMillis / 1000);
+                if (durationSeconds <= 0) return null;
+
+                const endTime = new Date();
+                const startTime = new Date(endTime.getTime() - durationMillis);
+
+                return {
+                    app_package_name: pkg,
+                    start_time: startTime.toISOString(),
+                    end_time: endTime.toISOString(),
+                    duration_seconds: durationSeconds
+                };
+            }).filter(Boolean); // Remove nulls
+
+            return logs;
+        } catch (e) {
+            console.error("[UsageStatsService] Error fetching stats:", e);
+            return [];
+        }
     },
 
     /**
@@ -56,7 +86,11 @@ const UsageStatsService = {
             alert("In Expo Go, we simulate permissions!");
             return;
         }
-        // TODO: Open Native Settings
+        try {
+            MyUsageStats.requestPermission();
+        } catch (e) {
+            console.error("[UsageStatsService] Error requesting permission:", e);
+        }
     }
 };
 

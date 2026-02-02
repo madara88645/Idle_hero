@@ -40,6 +40,7 @@ class CharacterStats(BaseModel):
     willpower: int
     class_id: Optional[str] = None
     skill_points: int = 0
+    hero_class: Optional["HeroClass"] = None
     class Config:
         orm_mode = True
 

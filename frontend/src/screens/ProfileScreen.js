@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import HeroAvatar from '../components/HeroAvatar';
 import api from '../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,7 +36,7 @@ const ProfileScreen = ({ route }) => {
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top }]}>
             <View style={styles.header}>
-                <View style={styles.avatarPlaceholder} />
+                <HeroAvatar heroClass={stats?.hero_class} level={stats?.level} size={100} />
                 <Text style={styles.username}>{username}</Text>
                 <Text style={styles.heroClass}>{hero_class ? hero_class.name : "Novice Adventurer"}</Text>
             </View>

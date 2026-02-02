@@ -6,6 +6,9 @@ declare class MyUsageStatsModule extends NativeModule<MyUsageStatsModuleEvents> 
   PI: number;
   hello(): string;
   setValueAsync(value: string): Promise<void>;
+  hasPermission(): boolean;
+  requestPermission(): void;
+  getUsageStats(durationDays: number): Promise<{ [packageName: string]: number }>;
 }
 
 // This call loads the native module object from the JSI.

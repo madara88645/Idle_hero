@@ -18,8 +18,9 @@
     "react-dom": "18.3.1",
     "react-native": "0.76.6",
     "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "^5.6.2",
-    "react-native-screens": "^4.20.0",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "usage-stats": "./modules/usage-stats",
     "react-native-web": "^0.21.2"
   },
   "private": true,

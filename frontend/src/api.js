@@ -8,4 +8,20 @@ const api = axios.create({
     baseURL: BASE_URL,
 });
 
+// --- Quests ---
+api.getQuests = async (userId) => {
+    try {
+        const response = await api.get(`/quests/${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching quests:", error);
+        return [];
+    }
+};
+
+api.claimQuest = async (questId) => {
+    const response = await api.post(`/quests/claim/${questId}`);
+    return response.data;
+};
+
 export default api;

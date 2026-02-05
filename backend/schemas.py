@@ -167,3 +167,28 @@ class SyncResponseWithKingdom(BaseModel):
     insight: Optional[str] = None
     battle: Optional[BattleSummary] = None
     kingdom: Optional[KingdomSyncResult] = None
+
+
+# --- QUEST SCHEMAS ---
+
+class QuestDefinition(BaseModel):
+    id: str
+    code: str
+    title: str
+    description: Optional[str] = None
+    quest_type: str
+    target_progress: int
+    reward_xp: int
+    reward_gold: int
+
+    class Config:
+        from_attributes = True
+
+class UserQuest(BaseModel):
+    id: str
+    status: str
+    current_progress: int
+    definition: QuestDefinition
+
+    class Config:
+        from_attributes = True

@@ -3,12 +3,13 @@ Game Logic for Idle Hero: Digital Detox RPG
 Includes Boss Battle mechanics.
 """
 import random
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, Tuple
+import math
 
 from sqlalchemy.orm import Session
 
-from models import CharacterStats as StatsModel, BossEnemy, User
+from models import CharacterStats as StatsModel, BossEnemy, User, UnlockedSkill, UserQuest, QuestDefinition, QuestStatus
 from schemas import UsageLogCreate
 
 # Boss name pool for random generation
@@ -145,6 +146,41 @@ def calculate_battle_outcome(
         "level_up": leveled_up,
         "boss_name": boss.name
     }
+
+
+def check_quests(user: User, battle_summary: dict):
+    """
+    Evaluates active quests and updates progress.
+    Call this AFTER battle calculation.
+    """
+    
+    for uq in user.quests:
+        if uq.status != QuestStatus.IN_PROGRESS:
+            continue
+            
+        code = uq.definition.code
+        
+        # --- Logic Mapping ---
+        
+        # 1. DAILY_SYNC: Just syncing counts as 1
+        if code == "DAILY_SYNC":
+            uq.current_progress = 1
+            
+        # 2. FOCUS_MASTER: If player took 0 damage (perfect focus)
+        elif code == "FOCUS_MASTER":
+            if battle_summary["boss_damage_dealt"] == 0:
+                uq.current_progress += 1
+                
+        # 3. BOSS_SLAYER: Defeat the boss
+        elif code == "BOSS_SLAYER":
+             if battle_summary["boss_defeated"]:
+                 uq.current_progress += 1
+
+        # --- Completion Check ---
+        if uq.current_progress >= uq.definition.target_progress:
+            uq.status = QuestStatus.COMPLETED
+            uq.completed_at = datetime.utcnow()
+
 
 
 def calculate_xp_and_stats(current_stats: StatsModel, logs: list[UsageLogCreate], rules: list):

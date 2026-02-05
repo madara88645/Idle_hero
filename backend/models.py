@@ -35,6 +35,7 @@ class User(Base):
     unlocked_skills = relationship("UnlockedSkill", back_populates="user")
     boss_enemies = relationship("BossEnemy", back_populates="user")
     kingdom = relationship("Kingdom", back_populates="user", uselist=False)
+    quests = relationship("UserQuest", back_populates="user")
 
 class CharacterStats(Base):
     __tablename__ = "character_stats"
@@ -145,3 +146,50 @@ class Building(Base):
     health = Column(Integer, default=100)  # 0-100%
 
     kingdom = relationship("Kingdom", back_populates="buildings")
+
+
+# --- QUEST SYSTEM ---
+
+class QuestType(str, enum.Enum):
+    DAILY = "DAILY"           # Resets every day
+    STORY = "STORY"           # One-time progression
+    ACHIEVEMENT = "ACHIEVEMENT" # Long term milestones
+
+class QuestStatus(str, enum.Enum):
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"   # Finished but reward not claimed
+    CLAIMED = "CLAIMED"       # Done and dusted
+
+class QuestDefinition(Base):
+    """Template for a quest (e.g., 'Focus Master')."""
+    __tablename__ = "quest_definitions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    code = Column(String, unique=True, index=True) # Unique code for logic maps
+    title = Column(String, nullable=False)
+    description = Column(String)
+    quest_type = Column(String, default=QuestType.DAILY)
+    
+    target_progress = Column(Integer, default=1) # e.g. 100 minutes
+    reward_xp = Column(Integer, default=0)
+    reward_gold = Column(Integer, default=0)
+
+class UserQuest(Base):
+    """Link between User and Quest (Progress tracking)."""
+    __tablename__ = "user_quests"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"))
+    quest_def_id = Column(String, ForeignKey("quest_definitions.id"))
+    
+    status = Column(String, default=QuestStatus.IN_PROGRESS)
+    current_progress = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="quests")
+    definition = relationship("QuestDefinition")
+
+# Add relation to User class manually or via back_populates
+# We need to update User class to include 'quests' relationship
+

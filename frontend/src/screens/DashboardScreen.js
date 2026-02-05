@@ -188,37 +188,40 @@ const DashboardScreen = ({ navigation, route }) => {
                     style={[styles.hubZone, { backgroundColor: theme.colors.hubCastle, flex: 2 }]}
                     onPress={() => navigation.navigate('Kingdom', { userId: currentUserId })}
                 >
-                    <Text style={styles.hubIcon}>🏰</Text>
-                    <Text style={styles.hubLabel}>Kingdom</Text>
-                </TouchableOpacity>
-
-                {/* Middle Row: Boss & Town */}
-                <View style={{ flexDirection: 'row', height: 120, marginTop: 10 }}>
-                    <TouchableOpacity
-                        style={[styles.hubZone, { backgroundColor: theme.colors.hubBoss, flex: 1, marginRight: 5 }]}
-                        onPress={() => navigation.navigate('BossBattle', { userId: currentUserId })}
-                    >
-                        <Text style={styles.hubIcon}>👹</Text>
-                        <Text style={styles.hubLabel}>Boss Lair</Text>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Kingdom')}>
+                        <Text style={styles.actionButtonText}>Build Kingdom 🏰</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Quests')}>
+                        <Text style={styles.actionButtonText}>Quest Log 📜</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.hubZone, { backgroundColor: theme.colors.hubTown, flex: 1, marginLeft: 5 }]}
-                        onPress={() => navigation.navigate('Rules', { userId: currentUserId })}
-                    >
-                        <Text style={styles.hubIcon}>📜</Text>
-                        <Text style={styles.hubLabel}>Town Hall</Text>
-                    </TouchableOpacity>
-                </View>
+                    {/* Middle Row: Boss & Town */}
+                    <View style={{ flexDirection: 'row', height: 120, marginTop: 10 }}>
+                        <TouchableOpacity
+                            style={[styles.hubZone, { backgroundColor: theme.colors.hubBoss, flex: 1, marginRight: 5 }]}
+                            onPress={() => navigation.navigate('BossBattle', { userId: currentUserId })}
+                        >
+                            <Text style={styles.hubIcon}>👹</Text>
+                            <Text style={styles.hubLabel}>Boss Lair</Text>
+                        </TouchableOpacity>
 
-                {/* Bottom Row: Profile (Barracks) */}
-                <TouchableOpacity
-                    style={[styles.hubZone, { backgroundColor: theme.colors.hubMarket, marginTop: 10, height: 60, flexDirection: 'row', justifyContent: 'center' }]}
-                    onPress={() => navigation.navigate('Profile', { userId: currentUserId })}
-                >
-                    <Text style={{ fontSize: 24, marginRight: 10 }}>⛺</Text>
-                    <Text style={[styles.hubLabel, { marginTop: 0 }]}>My Tent (Profile)</Text>
-                </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.hubZone, { backgroundColor: theme.colors.hubTown, flex: 1, marginLeft: 5 }]}
+                            onPress={() => navigation.navigate('Rules', { userId: currentUserId })}
+                        >
+                            <Text style={styles.hubIcon}>📜</Text>
+                            <Text style={styles.hubLabel}>Town Hall</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Bottom Row: Profile (Barracks) */}
+                    <TouchableOpacity
+                        style={[styles.hubZone, { backgroundColor: theme.colors.hubMarket, marginTop: 10, height: 60, flexDirection: 'row', justifyContent: 'center' }]}
+                        onPress={() => navigation.navigate('Profile', { userId: currentUserId })}
+                    >
+                        <Text style={{ fontSize: 24, marginRight: 10 }}>⛺</Text>
+                        <Text style={[styles.hubLabel, { marginTop: 0 }]}>My Tent (Profile)</Text>
+                    </TouchableOpacity>
             </View>
 
             <View style={{ height: 40 }} />

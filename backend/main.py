@@ -14,7 +14,10 @@ from game_logic import (
     get_todays_boss, 
     calculate_battle_outcome,
     collect_resources,
-    construct_building
+    calculate_battle_outcome,
+    collect_resources,
+    construct_building,
+    check_quests
 )
 import models
 
@@ -151,6 +154,14 @@ def sync_usage(user_id: str, logs: list[UsageLogCreate], db: Session = Depends(g
     else:
         xp, leveled_up, _ = calculate_xp_and_stats(stats, logs, user.rules)
         insight = "✨ Today's boss already defeated! Enjoy your victory."
+    
+        xp, leveled_up, _ = calculate_xp_and_stats(stats, logs, user.rules)
+        insight = "✨ Today's boss already defeated! Enjoy your victory."
+    
+    # --- QUEST CHECK ---
+    if battle_summary:
+        # Convert Pydantic model to dict for logic function
+        check_quests(user, battle_summary.dict())
     
     # --- KINGDOM RESOURCE COLLECTION ---
     kingdom_result = None
@@ -339,4 +350,116 @@ def select_class(user_id: str, class_id: str, db: Session = Depends(get_db)):
     db.refresh(user.stats)
     
     return user.stats
+
+
+# =====================
+# QUEST ENDPOINTS
+# =====================
+
+def seed_default_quests(db: Session):
+    """Ensure default quest definitions exist."""
+    defaults = [
+        models.QuestDefinition(
+            code="DAILY_SYNC",
+            title="First Step",
+            description="Sync your usage stats for the first time today.",
+            quest_type=models.QuestType.DAILY,
+            target_progress=1,
+            reward_xp=50,
+            reward_gold=10
+        ),
+        models.QuestDefinition(
+            code="FOCUS_MASTER",
+            title="Focus Master",
+            description="Complete a day with 0 damage taken.",
+            quest_type=models.QuestType.DAILY,
+            target_progress=1,
+            reward_xp=150,
+            reward_gold=50
+        ),
+         models.QuestDefinition(
+            code="BOSS_SLAYER",
+            title="Boss Slayer",
+            description="Defeat the daily boss.",
+            quest_type=models.QuestType.DAILY,
+            target_progress=1,
+            reward_xp=200,
+            reward_gold=100
+        )
+    ]
+    
+    for q in defaults:
+        exists = db.query(models.QuestDefinition).filter_by(code=q.code).first()
+        if not exists:
+            db.add(q)
+    db.commit()
+
+
+@app.get("/quests/{user_id}", response_model=list[schemas.UserQuest])
+def get_user_quests(user_id: str, db: Session = Depends(get_db)):
+    """Get active quests for user. Seeds defaults if none exist."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Seed definitions if missing
+    seed_default_quests(db)
+
+    # Assign quests to user if they don't have them
+    definitions = db.query(models.QuestDefinition).all()
+    for definition in definitions:
+        # Check if user has this quest (active or completed today)
+        # For DAILY quests, logic might be more complex (reset daily), 
+        # but for MVP we just check if it exists at all.
+        exists = db.query(models.UserQuest).filter_by(
+            user_id=user_id, 
+            quest_def_id=definition.id
+        ).first()
+        
+        if not exists:
+            new_quest = models.UserQuest(
+                user_id=user_id,
+                quest_def_id=definition.id,
+                status=models.QuestStatus.IN_PROGRESS,
+                current_progress=0
+            )
+            db.add(new_quest)
+    
+    db.commit()
+    return user.quests
+
+
+@app.post("/quests/claim/{quest_id}", response_model=schemas.UserQuest)
+def claim_quest_reward(quest_id: str, db: Session = Depends(get_db)):
+    """Claim reward for a completed quest."""
+    quest = db.query(models.UserQuest).filter(models.UserQuest.id == quest_id).first()
+    if not quest:
+        raise HTTPException(status_code=404, detail="Quest not found")
+        
+    if quest.status != models.QuestStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Quest not completed or already claimed")
+        
+    # Grant rewards
+    user = quest.user
+    rewards = quest.definition
+    
+    # XP
+    if user.stats:
+        user.stats.xp += rewards.reward_xp
+        # Simple level up check (could utilize reuse logic but keeping inline script for safety)
+        if user.stats.xp >= 100 * user.stats.level:
+            user.stats.level += 1
+            user.stats.xp -= 100 * (user.stats.level - 1)
+            user.stats.health = user.stats.max_health # Heal on level up
+            
+    # Gold (Kingdom)
+    if user.kingdom:
+        user.kingdom.gold += rewards.reward_gold
+        
+    # Update Status
+    quest.status = models.QuestStatus.CLAIMED
+    db.commit()
+    db.refresh(quest)
+    
+    return quest
 

@@ -1,10 +1,16 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import MyUsageStats from '../../modules/my-usage-stats';
 
 /**
  * Service to abstract Usage Stats logic.
- * Swaps between Mock Data (Expo Go) and Real Data (Native Build).
+ * Swaps between Mock Data (Expo Go / Web) and Real Data (Native Build).
  */
+
+// Check if we're in a non-native environment (Expo Go or Web)
+const isNonNativeEnvironment = () => {
+    return Platform.OS === 'web' || Constants.appOwnership === 'expo';
+};
 
 const MOCK_LOGS = [
     {
@@ -28,8 +34,8 @@ const UsageStatsService = {
      * Checks if the app has permission to access usage stats.
      */
     hasPermission: async () => {
-        if (Constants.appOwnership === 'expo') {
-            console.log("[UsageStatsService] Running in Expo Go. Permission simulated.");
+        if (isNonNativeEnvironment()) {
+            console.log("[UsageStatsService] Running in Web/Expo Go. Permission simulated.");
             return true;
         }
         try {
@@ -44,8 +50,8 @@ const UsageStatsService = {
      * Gets usage stats for today.
      */
     getTodayUsage: async () => {
-        if (Constants.appOwnership === 'expo') {
-            console.log("[UsageStatsService] Returning Mock Data for Expo Go.");
+        if (isNonNativeEnvironment()) {
+            console.log("[UsageStatsService] Returning Mock Data for Web/Expo Go.");
             return MOCK_LOGS;
         }
 
@@ -82,8 +88,8 @@ const UsageStatsService = {
      * Request permission.
      */
     requestPermission: async () => {
-        if (Constants.appOwnership === 'expo') {
-            alert("In Expo Go, we simulate permissions!");
+        if (isNonNativeEnvironment()) {
+            console.log("[UsageStatsService] In Web/Expo Go, permissions are simulated!");
             return;
         }
         try {

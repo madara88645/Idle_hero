@@ -10,6 +10,7 @@ import BossBattleScreen from './src/screens/BossBattleScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ClassSelectionScreen from './src/screens/ClassSelectionScreen';
 import GatewayScreen from './src/screens/GatewayScreen';
+import QuestScreen from './src/screens/QuestScreen';
 import UsageStatsService from './src/services/UsageStatsService';
 
 const Stack = createNativeStackNavigator();
@@ -52,7 +53,8 @@ export default function App() {
             <Stack.Screen name="Kingdom" component={KingdomScreen} />
             <Stack.Screen name="BossBattle" component={BossBattleScreen} options={{ title: 'Boss Battle' }} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} options={{ title: 'Choose Class', headerLeft: null }} />
+            <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} options={{ gestureEnabled: false, headerLeft: () => null }} />
+            <Stack.Screen name="Quests" component={QuestScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       ) : (

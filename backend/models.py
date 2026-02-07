@@ -55,6 +55,7 @@ class CharacterStats(Base):
     defense = Column(Integer, default=2)        # Damage reduction
     health = Column(Integer, default=100)       # Player health
     max_health = Column(Integer, default=100)   # Max health cap
+    gold = Column(Integer, default=0)           # Currency
     
     # Class system
     class_id = Column(String, ForeignKey("hero_classes.id"), nullable=True)

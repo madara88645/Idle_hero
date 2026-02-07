@@ -38,6 +38,7 @@ class CharacterStats(BaseModel):
     discipline: int
     energy: int
     willpower: int
+    gold: int = 0
     class_id: Optional[str] = None
     skill_points: int = 0
     hero_class: Optional["HeroClass"] = None

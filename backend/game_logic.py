@@ -136,6 +136,7 @@ def calculate_battle_outcome(
         # Restore health on level up
         stats.health = stats.max_health
     
+    print(f"DEBUG: logs={len(logs)}, screen_min={total_screen_minutes}, boss_dmg={actual_boss_damage}, hp={stats.health}, leveled={leveled_up}")
     return {
         "player_damage_dealt": player_damage,
         "boss_damage_dealt": actual_boss_damage,

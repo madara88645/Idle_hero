@@ -21,10 +21,18 @@ from game_logic import (
 )
 import models
 
+from routers import admin
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Idle Hero API")
+app = FastAPI(
+    title="Idle Hero API",
+    description="Backend for the Digital Detox RPG",
+    version="1.0.0"
+)
+
+app.include_router(admin.router)
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -453,6 +461,12 @@ def claim_quest_reward(quest_id: str, db: Session = Depends(get_db)):
             user.stats.health = user.stats.max_health # Heal on level up
             
     # Gold (Kingdom)
+    # Gold
+    if user.stats:
+        user.stats.gold += rewards.reward_gold
+    
+    # Also update Kingdom gold if exists (sync them or just bonus?)
+    # For now, let's keep them separate or just use stats.gold as main.
     if user.kingdom:
         user.kingdom.gold += rewards.reward_gold
         

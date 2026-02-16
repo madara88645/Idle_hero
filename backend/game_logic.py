@@ -1,53 +1,83 @@
-from schemas import CharacterStats, UsageLogCreate
-from models import CharacterStats as StatsModel
+from datetime import datetime
+import math
 
-def calculate_xp_and_stats(current_stats: StatsModel, logs: list[UsageLogCreate], rules: list):
-    """
-    Idle Game Logic:
-    - XP is gained for time spent AWAY from bad apps (time elapsed since last sync).
-    - Usage reported in logs reduces the gained XP.
-    """
-    from datetime import datetime, timezone
+# Experience Curve
+BASE_XP = 100
+FACTOR = 1.5
+
+def calculate_xp_required(level: int) -> int:
+    return int(BASE_XP * (level ** FACTOR))
+
+BUILDING_COSTS = {
+    "mine": {"bronze": 500, "gold": 50, "diamond": 0},
+    "park": {"bronze": 200, "gold": 100, "diamond": 0},
+    "school": {"bronze": 1000, "gold": 200, "diamond": 5},
+    "fire_station": {"bronze": 1500, "gold": 300, "diamond": 10},
+    "hospital": {"bronze": 2000, "gold": 500, "diamond": 20},
+    "town_hall": {"bronze": 5000, "gold": 1000, "diamond": 50},
+}
+
+def calculate_xp_and_stats(current_stats, usage_logs, rules):
+    total_xp_gained = 0
+    message = "Good job!"
     
-    now = datetime.now(timezone.utc)
-    
-    # Calculate time elapsed since last sync
-    if current_stats.last_sync_time:
-        # Ensure last_sync_time is timezone-aware if now is
-        last_sync = current_stats.last_sync_time
-        if last_sync.tzinfo is None:
-            last_sync = last_sync.replace(tzinfo=timezone.utc)
-            
-        elapsed_seconds = (now - last_sync).total_seconds()
-    else:
-        elapsed_seconds = 0
+    # Simple logic
+    for log in usage_logs:
+        # Check against rules
+        rule = next((r for r in rules if r.app_package_name == log.app_package_name), None)
+        duration_mins = log.duration_seconds / 60
         
-    elapsed_minutes = elapsed_seconds / 60
+        if rule:
+             if duration_mins > rule.daily_limit_minutes:
+                 # Penalty
+                 total_xp_gained -= 10
+                 message = "Limit exceeded! Lost XP."
+             else:
+                 # Reward
+                 total_xp_gained += 20
+        else:
+             # Default reward for tracking
+             total_xp_gained += 5
+
+    # Update Stats
+    if current_stats.xp is None: current_stats.xp = 0
+    current_stats.xp += total_xp_gained
     
-    # Cooldown Check: 60 Minutes (1 Hour)
-    if elapsed_minutes < 60:
-        return 0, False, current_stats, "It hasn't been 1 hour since your last activity."
+    # Award resources based on XP (Stub logic)
+    if total_xp_gained > 0:
+        if current_stats.bronze is None: current_stats.bronze = 0
+        if current_stats.gold is None: current_stats.gold = 0
+        if current_stats.diamond is None: current_stats.diamond = 0
+        
+        current_stats.bronze += int(total_xp_gained * 2)
+        current_stats.gold += int(total_xp_gained * 0.5) + 10000
+        # Diamonds are rare, maybe only on level up
     
-    # Base Reward: 1 XP per minute of idle time
-    base_xp = int(elapsed_minutes * 1)
-    
-    # Usage Penalty: 
-    total_usage_seconds = sum(log.duration_seconds for log in logs)
-    usage_minutes = total_usage_seconds / 60
-    
-    # Penalty: 2 XP lost per minute of usage
-    penalty_xp = int(usage_minutes * 2)
-    
-    # Net XP
-    xp_gained = max(0, base_xp - penalty_xp)
-    
-    # Update stats
-    current_stats.last_sync_time = now
-    current_stats.xp += xp_gained
-    
-    if current_stats.xp >= 100 * current_stats.level:
+    # Level Up Check
+    if current_stats.level is None: current_stats.level = 1
+    xp_req = calculate_xp_required(current_stats.level)
+    leveled_up = False
+    if current_stats.xp >= xp_req:
         current_stats.level += 1
-        current_stats.xp = 0 # Rollover or keep remainder
-        return xp_gained, True, current_stats, "Great job! Level Up!"
+        current_stats.xp -= xp_req
+        leveled_up = True
+        message = "LEVEL UP! City expanded."
+        # Bonus resources on level up
+        current_stats.gold += 100
+        current_stats.diamond += 5
         
-    return xp_gained, False, current_stats, "Great job! Your focus is improving."
+
+    return total_xp_gained, leveled_up, current_stats, message
+
+def calculate_upgrade_cost(building_type: str, current_level: int) -> dict:
+    base_cost = BUILDING_COSTS.get(building_type)
+    if not base_cost:
+        return None
+    
+    multiplier = 1.5 ** current_level
+    
+    return {
+        "bronze": int(base_cost["bronze"] * multiplier),
+        "gold": int(base_cost["gold"] * multiplier),
+        "diamond": int(base_cost["diamond"] * multiplier)
+    }

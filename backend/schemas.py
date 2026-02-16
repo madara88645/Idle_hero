@@ -24,6 +24,9 @@ class CharacterStats(BaseModel):
     discipline: int
     energy: int
     willpower: int
+    gold: int
+    diamond: int
+    bronze: int
     class Config:
         orm_mode = True
 
@@ -56,6 +59,27 @@ class SyncResponse(BaseModel):
     new_stats: CharacterStats
     insight: Optional[str] = None
 
+# City Schemas
+class CityStateBase(BaseModel):
+    level: int
+    unlocked_rings: int
+    population: int
+
+class CityState(CityStateBase):
+    class Config:
+        orm_mode = True
+
+# Building Schemas
+class UserBuilding(BaseModel):
+    id: int
+    building_type: str
+    level: int
+    purchased_at: datetime
+    class Config:
+        orm_mode = True
+
 class UserProfile(User):
     stats: Optional[CharacterStats] = None
+    city_state: Optional[CityState] = None
     rules: List[DetoxRule] = []
+    buildings: List[UserBuilding] = []

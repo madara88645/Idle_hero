@@ -121,6 +121,116 @@ const Billboard = ({ angle, radius }) => {
     );
 };
 
+// Electric Pulse Component - Shockwave from Core
+const ElectricPulse = ({ radius, color, delay }) => {
+    const anim = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        const loop = Animated.loop(
+            Animated.timing(anim, {
+                toValue: 1,
+                duration: 2000,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: false, // Scale/Opacity
+                delay: delay
+            })
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+
+    const scale = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 2.5] // Expand to 2.5x size
+    });
+
+    const opacity = anim.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: [0.8, 0.4, 0] // Fade out
+    });
+
+    return (
+        <Animated.View style={{
+            position: 'absolute',
+            width: radius * 2,
+            height: radius * 2,
+            borderRadius: radius,
+            borderColor: color,
+            borderWidth: 2,
+            opacity: opacity,
+            transform: [{ scale }],
+            zIndex: 1 // Behind everything
+        }} />
+    );
+};
+
+// Power Vein Component - Connects Core to Wall
+const PowerVein = ({ angle, startRadius, endRadius }) => {
+    const length = endRadius - startRadius;
+    const anim = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: 1000 + Math.random() * 1000, // Faster, jittery
+                    easing: Easing.linear,
+                    useNativeDriver: false
+                }),
+                Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: false }) // Reset instantly
+            ])
+        );
+
+        // Random start time
+        setTimeout(() => loop.start(), Math.random() * 1000);
+
+        return () => loop.stop();
+    }, []);
+
+    const pulseTranslate = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [length, -length * 0.2] // Move full length
+    });
+
+    return (
+        <View style={{
+            position: 'absolute',
+            justifyContent: 'center',
+            alignItems: 'center',
+            transform: [
+                { rotate: `${angle}deg` },
+                { translateY: -(startRadius + length / 2) } // Center of the vein segment
+            ],
+            zIndex: 4 // Below population, above background
+        }}>
+            {/* The Vein Track */}
+            <View style={{
+                width: 1, // Thinner
+                height: length,
+                backgroundColor: 'rgba(138, 43, 226, 0.1)', // Very faint
+                overflow: 'hidden',
+                borderRadius: 1
+            }}>
+                {/* The Energy Pulse - Shorter, brighter */}
+                <Animated.View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '20%',
+                    backgroundColor: '#00FFFF', // Cyan Electricity
+                    opacity: 1,
+                    shadowColor: '#00FFFF',
+                    shadowRadius: 5,
+                    shadowOpacity: 1,
+                    transform: [{ translateY: pulseTranslate }]
+                }} />
+            </View>
+        </View>
+    );
+};
+
 const CityMapScreen = ({ navigation, route }) => {
     // Safety check for params
     const userId = route.params?.userId;
@@ -300,6 +410,7 @@ const CityMapScreen = ({ navigation, route }) => {
 
 
     const maxRingRadius = coreRadius + ringStep * safeUnlockedRings;
+    const wallRadius = (maxRingRadius + 10) * 1.1; // Increased by 10% as requested
 
     return (
         <View style={COMMON_STYLES.container}>
@@ -316,6 +427,7 @@ const CityMapScreen = ({ navigation, route }) => {
 
             <View style={[styles.mapContainer, { paddingBottom: 60 }]}>
 
+
                 {/* Dynamically Render Rings (Outer to Inner for stacking context if needed, but absolute positioning handles it) */}
                 {/* Actually reverse map might be better for z-index if they overlap, but rings are concentric. */}
                 {rings.map(ring => (
@@ -324,14 +436,24 @@ const CityMapScreen = ({ navigation, route }) => {
                     </View>
                 ))}
 
+                {/* Power Veins - Connecting Core to Outer Wall */}
+                {Array.from({ length: 12 }).map((_, i) => (
+                    <PowerVein
+                        key={`vein-${i}`}
+                        angle={i * 30}
+                        startRadius={coreRadius}
+                        endRadius={wallRadius} // Connect to new wall radius
+                    />
+                ))}
+
 
                 {/* Outer Wall */}
                 {/* Wall scaled relative to max unlocked ring */}
                 <Animated.View style={[
                     styles.ring,
                     {
-                        width: (maxRingRadius + 10) * 2,
-                        height: (maxRingRadius + 10) * 2,
+                        width: wallRadius * 2,
+                        height: wallRadius * 2,
                         borderColor: wallBorderColor, // Animated Color
                         borderWidth: 4,
                         borderStyle: 'dashed', // Cyber look
@@ -345,11 +467,18 @@ const CityMapScreen = ({ navigation, route }) => {
                 ]} />
 
                 {/* Population Layer */}
-                <PopulationLayer population={cityState.population} maxRadius={maxRingRadius - 15} minRadius={coreRadius + 10} />
+                <PopulationLayer population={cityState.population} maxRadius={wallRadius - 25} minRadius={coreRadius + 10} />
 
                 {/* Core */}
                 <View style={[styles.core, { width: coreRadius * 2, height: coreRadius * 2 }]}>
                     <View style={styles.coreInner} />
+                </View>
+
+                {/* Electric Pulses from Core - Behind Core (visually, via zIndex or order) but practically centered */}
+                <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center', zIndex: 0 }}>
+                    <ElectricPulse radius={coreRadius} color={COLORS.primary} delay={0} />
+                    <ElectricPulse radius={coreRadius} color={COLORS.primaryDark} delay={600} />
+                    <ElectricPulse radius={coreRadius} color="#00FFFF" delay={1200} />
                 </View>
 
                 {/* Billboards */}

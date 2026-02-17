@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Alert } from 'react-native';
-import { COLORS } from '../constants/theme';
+import { COLORS } from '../styles/theme';
 import api from '../api';
 import QuestCard from '../components/QuestCard';
 

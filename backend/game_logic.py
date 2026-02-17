@@ -33,13 +33,13 @@ def calculate_xp_required(level: int) -> int:
 
 # Building Costs (Friend's Logic)
 BUILDING_COSTS = {
-    "mine": {"bronze": 500, "gold": 50, "diamond": 0},
+    "mine": {"bronze": 300, "gold": 50, "diamond": 0},
     "park": {"bronze": 200, "gold": 100, "diamond": 0},
     "school": {"bronze": 1000, "gold": 200, "diamond": 5},
     "fire_station": {"bronze": 1500, "gold": 300, "diamond": 10},
     "hospital": {"bronze": 2000, "gold": 500, "diamond": 20},
-    "town_hall": {"bronze": 5000, "gold": 1000, "diamond": 50},
-}
+    "town_hall": {"bronze": 3000, "gold": 800, "diamond": 50},
+},
 
 # ==========================================
 # BOSS BATTLE LOGIC (My Logic)
@@ -193,8 +193,8 @@ def apply_level_up(stats: StatsModel) -> Tuple[bool, str]:
         # Resource Bonus (Friend's Logic)
         if stats.gold is None: stats.gold = 0
         if stats.diamond is None: stats.diamond = 0
-        stats.gold += 100
-        stats.diamond += 5
+        stats.gold += 150
+        stats.diamond += 10
         
         return True, "LEVEL UP! City expanded."
     

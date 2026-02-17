@@ -2,13 +2,38 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, Image, StatusBar } from 'react-native';
 import api from '../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme, commonStyles } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, COMMON_STYLES } from '../styles/theme';
+import AnimatedBar from '../components/AnimatedBar';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSequence,
+    withTiming,
+    withRepeat
+} from 'react-native-reanimated';
 
 const BossBattleScreen = ({ route }) => {
     const insets = useSafeAreaInsets();
     const userId = route.params?.userId;
     const [boss, setBoss] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    // Shake Animation
+    const shake = useSharedValue(0);
+    const animatedBossStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateX: shake.value }],
+        };
+    });
+
+    const triggerShake = () => {
+        shake.value = withSequence(
+            withTiming(15, { duration: 50 }),
+            withRepeat(withTiming(-15, { duration: 50 }), 5, true),
+            withTiming(0, { duration: 50 })
+        );
+    };
 
     const fetchBoss = async () => {
         setLoading(true);
@@ -27,97 +52,164 @@ const BossBattleScreen = ({ route }) => {
         if (userId) fetchBoss();
     }, [userId]);
 
-    if (!userId) return <Text style={[commonStyles.text, styles.center]}>No User ID</Text>;
-    if (loading && !boss) return <ActivityIndicator size="large" color={theme.colors.danger} style={styles.center} />;
+    // Trigger shake when player takes damage or boss is updated (mock logic for now)
+    useEffect(() => {
+        if (boss && boss.damage_dealt_to_user > 0) {
+            // triggerShake(); // Optional: Shake on load if damaged
+        }
+    }, [boss]);
+
+    if (!userId) return <Text style={[COMMON_STYLES.text, styles.center]}>No User ID</Text>;
+
+    if (loading && !boss) return (
+        <View style={[COMMON_STYLES.container, styles.center]}>
+            <ActivityIndicator size="large" color={COLORS.error} />
+            <Text style={[COMMON_STYLES.text, { marginTop: 20 }]}>Summoning Boss...</Text>
+        </View>
+    );
 
     if (!boss) return (
-        <View style={[commonStyles.container, styles.center]}>
-            <TouchableOpacity onPress={fetchBoss} style={{ padding: 20, backgroundColor: theme.colors.primary, borderRadius: 10 }}>
-                <Text style={{ color: 'white', fontWeight: 'bold' }}>Summon Boss</Text>
+        <View style={[COMMON_STYLES.container, styles.center]}>
+            <TouchableOpacity onPress={fetchBoss} style={COMMON_STYLES.buttonPrimary}>
+                <Text style={COMMON_STYLES.buttonText}>Summon Boss</Text>
             </TouchableOpacity>
         </View>
     );
 
-    const hpPercentage = (boss.current_hp / boss.total_hp) * 100;
-    const hpColor = hpPercentage > 50 ? theme.colors.success : hpPercentage > 20 ? theme.colors.gold : theme.colors.danger;
-
     return (
-        <ScrollView style={[commonStyles.container, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-            <Text style={[styles.header, { marginTop: 20 }]}>COMBAT ZONE</Text>
+        <LinearGradient
+            colors={[COLORS.background, '#2a0505', '#000000']}
+            style={[COMMON_STYLES.container]}
+        >
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-            {/* Boss Card */}
-            <View style={styles.bossCard}>
-                <View style={styles.bossAvatarContainer}>
-                    <Text style={{ fontSize: 80 }}>👹</Text>
-                </View>
-                <Text style={styles.bossName}>{boss.name}</Text>
+            <ScrollView contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 50, paddingHorizontal: 20 }}>
+                <Text style={styles.header}>COMBAT ZONE</Text>
 
-                {boss.is_defeated ? (
-                    <Text style={styles.victoryText}>☠️ DEFEATED ☠️</Text>
-                ) : (
-                    <Text style={styles.statusText}>⚠️ ENGAGED ⚠️</Text>
-                )}
-
-                {/* HP Bar */}
-                <View style={styles.hpContainer}>
-                    <View style={styles.hpHeader}>
-                        <Text style={styles.hpLabel}>BOSS HP</Text>
-                        <Text style={styles.hpValue}>{boss.current_hp} / {boss.total_hp}</Text>
+                {/* Boss Card */}
+                <Animated.View style={[styles.bossCard, animatedBossStyle]}>
+                    <View style={styles.bossAvatarContainer}>
+                        <Text style={{ fontSize: 80 }}>👹</Text>
                     </View>
-                    <View style={styles.hpBarBg}>
-                        <View style={[styles.hpBarFill, { width: `${hpPercentage}%`, backgroundColor: hpColor }]} />
+                    <Text style={styles.bossName}>{boss.name}</Text>
+
+                    {boss.is_defeated ? (
+                        <Text style={styles.victoryText}>☠️ DEFEATED ☠️</Text>
+                    ) : (
+                        <Text style={styles.statusText}>⚠️ ENGAGED ⚠️</Text>
+                    )}
+
+                    {/* HP Bar */}
+                    <View style={styles.hpContainer}>
+                        <AnimatedBar
+                            label="Boss HP"
+                            value={boss.current_hp}
+                            max={boss.total_hp}
+                            color={boss.current_hp > 50 ? COLORS.success : COLORS.error}
+                            height={16}
+                        />
+                    </View>
+
+                    {/* Battle Stats */}
+                    <View style={styles.statBox}>
+                        <Text style={styles.statText}>💀 Player Damage Taken: {boss.damage_dealt_to_user}</Text>
+                    </View>
+                </Animated.View>
+
+                {/* Battle Log / Instructions */}
+                <View style={[COMMON_STYLES.card, { borderColor: COLORS.primaryDark }]}>
+                    <Text style={styles.logTitle}>BATTLE LOG RECENT</Text>
+                    <View style={styles.logItem}>
+                        <Text style={styles.logText}>ℹ️ Focus time deals damage to Boss.</Text>
+                    </View>
+                    <View style={styles.logItem}>
+                        <Text style={styles.logText}>ℹ️ Distraction (Screen Time) hurts YOU.</Text>
                     </View>
                 </View>
 
-                {/* Battle Stats */}
-                <View style={styles.statBox}>
-                    <Text style={styles.statText}>💀 Player Damage Taken: {boss.damage_dealt_to_user}</Text>
-                </View>
-            </View>
-
-            {/* Battle Log / Instructions */}
-            <View style={styles.logContainer}>
-                <Text style={styles.logTitle}>BATTLE LOG</Text>
-                <View style={styles.logItem}>
-                    <Text style={styles.logText}>ℹ️ Focus time deals damage to Boss.</Text>
-                </View>
-                <View style={styles.logItem}>
-                    <Text style={styles.logText}>ℹ️ Distraction (Screen Time) hurts YOU.</Text>
-                </View>
-            </View>
-
-            <TouchableOpacity style={styles.refreshButton} onPress={fetchBoss}>
-                <Text style={styles.refreshButtonText}>⚔️ Refresh Battle Status ⚔️</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 40 }} />
-        </ScrollView>
+                {/* Manual Trigger for testing shake */}
+                <TouchableOpacity
+                    style={[COMMON_STYLES.buttonPrimary, { backgroundColor: COLORS.error }]}
+                    onPress={() => {
+                        fetchBoss();
+                        triggerShake();
+                    }}
+                >
+                    <Text style={COMMON_STYLES.buttonText}>⚔️ Refresh & Attack ⚔️</Text>
+                </TouchableOpacity>
+            </ScrollView>
+        </LinearGradient>
     );
 };
 
 const styles = StyleSheet.create({
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-    header: { fontSize: 32, fontWeight: '900', color: theme.colors.danger, textAlign: 'center', marginBottom: 20, letterSpacing: 2, textShadowColor: 'red', textShadowRadius: 10 },
-    bossCard: { backgroundColor: '#200505', padding: 25, borderRadius: theme.borderRadius.l, alignItems: 'center', borderWidth: 2, borderColor: theme.colors.danger, marginBottom: 30, elevation: 10 },
-    bossAvatarContainer: { marginBottom: 15, backgroundColor: 'rgba(255,0,0,0.1)', borderRadius: 100, padding: 20, borderWidth: 1, borderColor: theme.colors.danger },
-    bossName: { fontSize: 28, fontWeight: 'bold', color: theme.colors.text, marginBottom: 5, textTransform: 'uppercase' },
-    victoryText: { color: theme.colors.success, fontSize: 20, fontWeight: 'bold', marginVertical: 10, letterSpacing: 1 },
-    statusText: { color: theme.colors.gold, fontSize: 16, fontWeight: 'bold', marginVertical: 10 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: COLORS.error,
+        textAlign: 'center',
+        marginBottom: 24,
+        letterSpacing: 2,
+        textShadowColor: 'red',
+        textShadowRadius: 15
+    },
+    bossCard: {
+        backgroundColor: 'rgba(50, 10, 10, 0.8)',
+        padding: 24,
+        borderRadius: 24,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.error,
+        marginBottom: 30,
+        shadowColor: COLORS.error,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 20,
+        elevation: 10
+    },
+    bossAvatarContainer: {
+        marginBottom: 16,
+        backgroundColor: 'rgba(255,0,0,0.1)',
+        borderRadius: 100,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: COLORS.error
+    },
+    bossName: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        marginBottom: 8,
+        textTransform: 'uppercase'
+    },
+    victoryText: {
+        color: COLORS.success,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginVertical: 12,
+        letterSpacing: 1
+    },
+    statusText: {
+        color: COLORS.gold,
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginVertical: 12
+    },
     hpContainer: { width: '100%', marginVertical: 20 },
-    hpHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-    hpLabel: { color: theme.colors.subtext, fontWeight: 'bold' },
-    hpValue: { color: theme.colors.text, fontWeight: 'bold' },
-    hpBarBg: { height: 20, backgroundColor: '#3e1a1a', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#5c2b2b' },
-    hpBarFill: { height: '100%', borderRadius: 10 },
-    statBox: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, width: '100%', alignItems: 'center' },
+    statBox: {
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        padding: 12,
+        borderRadius: 8,
+        width: '100%',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,100,100,0.3)'
+    },
     statText: { color: '#ff8a80', fontSize: 14, fontWeight: 'bold' },
-    logContainer: { backgroundColor: theme.colors.surface, padding: 15, borderRadius: theme.borderRadius.m, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.cardBorder },
-    logTitle: { color: theme.colors.subtext, fontSize: 12, marginBottom: 10, fontWeight: 'bold', letterSpacing: 1 },
+    logTitle: { color: COLORS.secondary, fontSize: 12, marginBottom: 10, fontWeight: 'bold', letterSpacing: 1 },
     logItem: { flexDirection: 'row', marginBottom: 5 },
-    logText: { color: theme.colors.text, fontSize: 14, fontFamily: 'monospace' },
-    refreshButton: { backgroundColor: theme.colors.danger, padding: 18, borderRadius: theme.borderRadius.m, alignItems: 'center', elevation: 5 },
-    refreshButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold', textTransform: 'uppercase' }
+    logText: { color: COLORS.textSecondary, fontSize: 14, fontFamily: 'monospace' },
 });
 
 export default BossBattleScreen;

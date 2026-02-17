@@ -5,8 +5,7 @@ from models import Base, User, CharacterStats, UsageLog, BossEnemy, Kingdom, Bui
 import schemas
 from schemas import (
     UserCreate, SyncResponse, UsageLogCreate, 
-    BossStatus, BattleSummary, SyncResponseWithBattle,
-    Kingdom as KingdomSchema, BuildRequest, KingdomSyncResult
+    BossStatus, BattleSummary
 )
 from game_logic import (
     generate_daily_boss, 
@@ -15,8 +14,6 @@ from game_logic import (
     calculate_hybrid_rewards,
     apply_level_up,
     check_quests,
-    construct_building, # Legacy
-    collect_resources, # Legacy
     BUILDING_COSTS
 )
 import models
@@ -33,6 +30,8 @@ app = FastAPI(
 )
 
 app.include_router(admin.router)
+from routers import debug
+app.include_router(debug.router)
 
 from fastapi.middleware.cors import CORSMiddleware
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS } from '../constants/theme';
+import { COLORS } from '../styles/theme';
 
 const QuestCard = ({ quest, onClaim }) => {
     const { definition, status, current_progress } = quest;

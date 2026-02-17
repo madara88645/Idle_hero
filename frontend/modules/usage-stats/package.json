@@ -1,0 +1,20 @@
+{
+    "name": "usage-stats",
+    "version": "1.0.0",
+    "description": "Native module for accessing Android usage stats",
+    "main": "index.ts",
+    "scripts": {
+        "build": "expo-module build",
+        "clean": "expo-module clean",
+        "test": "expo-module test",
+        "lint": "expo-module lint"
+    },
+    "keywords": [
+        "react-native",
+        "expo",
+        "usage-stats",
+        "android"
+    ],
+    "author": "Antigravity",
+    "license": "MIT"
+}

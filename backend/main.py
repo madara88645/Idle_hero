@@ -183,15 +183,29 @@ def buy_building(user_id: str, building_type: str, db: Session = Depends(get_db)
     building = models.UserBuilding(user_id=user_id, building_type=building_type)
     db.add(building)
     
-    # Add population based on building (Simple logic)
+    # Add population based on building
     if user.city_state:
         user.city_state.population += 100
-        # If building is Town Hall, unlock new ring
-        if building_type == 'town_hall':
-            user.city_state.unlocked_rings += 1
+        
+        # Calculate total buildings (including the one just added)
+        # Helper to calculate capacity: Ring 1 = 8, Ring 2 = 12, Ring 3 = 16...
+        def get_ring_capacity(ring_level):
+            return 8 + (ring_level - 1) * 4
+            
+        current_unlocked = user.city_state.unlocked_rings
+        total_buildings = db.query(models.UserBuilding).filter(models.UserBuilding.user_id == user_id).count() + 1
+        
+        # Calculate max capacity of currently unlocked rings
+        current_capacity = 0
+        for i in range(1, current_unlocked + 1):
+             current_capacity += get_ring_capacity(i)
+             
+        # If we exceeded capacity, unlock next ring
+        if total_buildings > current_capacity:
+             user.city_state.unlocked_rings += 1
         
     db.commit()
-    return {"message": f"Purchased {building_type}", "success": True, "new_stats": stats}
+    return {"message": f"Purchased {building_type}", "success": True, "new_stats": stats, "unlocked_rings": user.city_state.unlocked_rings}
 
 @app.get("/city/buildings/{user_id}", response_model=list[schemas.UserBuilding])
 def get_user_buildings(user_id: str, db: Session = Depends(get_db)):

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, Animated, TouchableOpacity, Modal, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView, Animated, TouchableOpacity, Modal, Alert, Image, Easing } from 'react-native';
 import api from '../api';
 import { COLORS, COMMON_STYLES } from '../styles/theme';
 
@@ -33,7 +33,8 @@ const PopulationDot = ({ delay, duration, radius, initialAngle }) => {
             Animated.timing(animatedValue, {
                 toValue: 1,
                 duration: duration,
-                useNativeDriver: true,
+                easing: Easing.linear,
+                useNativeDriver: false, // Changed to false for Web compatibility
                 delay: delay
             })
         ).start();
@@ -83,6 +84,43 @@ const PopulationLayer = ({ population, maxRadius, minRadius }) => {
     );
 };
 
+const Billboard = ({ angle, radius }) => {
+    return (
+        <View style={{
+            position: 'absolute',
+            transform: [
+                { rotate: `${angle}deg` },
+                { translateY: -radius },
+                { rotate: `0deg` } // Keep text aligned with ring for now, or -90 to be upright relative to screen center if at top/bottom
+            ],
+            backgroundColor: 'rgba(0, 20, 40, 0.9)',
+            borderWidth: 1,
+            borderColor: '#0ff', // Cyan neon
+            borderRadius: 4,
+            padding: 4,
+            width: 80,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#0ff',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 5,
+            elevation: 5,
+            zIndex: 20
+        }}>
+            <Text style={{
+                color: '#0ff',
+                fontSize: 8,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                fontFamily: 'monospace',
+                textShadowColor: '#0ff',
+                textShadowRadius: 3
+            }}>{"OFFLINE IS\nTHE NEW TREND"}</Text>
+        </View>
+    );
+};
+
 const CityMapScreen = ({ navigation, route }) => {
     // Safety check for params
     const userId = route.params?.userId;
@@ -90,12 +128,44 @@ const CityMapScreen = ({ navigation, route }) => {
     const [cityState, setCityState] = useState(null);
     const [buildings, setBuildings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null); // Add error state
     const [selectedBuilding, setSelectedBuilding] = useState(null);
-    const [shopVisible, setShopVisible] = useState(false); // Add this state back if missing
+    const [shopVisible, setShopVisible] = useState(false);
+
+    // Animation for Outer Wall
+    const wallAnim = React.useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(wallAnim, {
+                    toValue: 1,
+                    duration: 2000, // 2 seconds to fade color
+                    useNativeDriver: false // Color interpolation doesn't support native driver
+                }),
+                Animated.timing(wallAnim, {
+                    toValue: 0,
+                    duration: 2000,
+                    useNativeDriver: false
+                })
+            ])
+        ).start();
+    }, []);
+
+    const wallBorderColor = wallAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [COLORS.gold, '#00FFFF'] // Gold to Cyan
+    });
+
+    const wallShadowColor = wallAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [COLORS.gold, '#00FFFF']
+    });
 
     useEffect(() => {
         if (!userId) {
             console.error("No userId provided to CityMapScreen");
+            setError("No User ID provided.");
             setLoading(false);
             return;
         }
@@ -111,13 +181,33 @@ const CityMapScreen = ({ navigation, route }) => {
             ]);
             setCityState(profileRes.data.city_state);
             setBuildings(buildingsRes.data);
+            setError(null);
         } catch (err) {
             console.error("Fetch city error:", err);
-            Alert.alert("Error", "Failed to load city data.");
+            setError("Failed to load city data. Please try again.");
+            // Alert.alert("Error", "Failed to load city data."); // Alert might be annoying if it loops
         } finally {
             setLoading(false);
         }
     };
+
+    if (loading) return (
+        <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={COMMON_STYLES.text}>Loading City Plan...</Text>
+        </View>
+    );
+
+    if (error) return (
+        <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={[COMMON_STYLES.text, { color: COLORS.error, marginBottom: 20 }]}>{error}</Text>
+            <TouchableOpacity onPress={fetchData} style={COMMON_STYLES.buttonPrimary}>
+                <Text style={COMMON_STYLES.buttonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
+                <Text style={{ color: 'white', textDecorationLine: 'underline' }}>Go Back</Text>
+            </TouchableOpacity>
+        </View>
+    );
 
     if (!userId) return (
         <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -128,91 +218,92 @@ const CityMapScreen = ({ navigation, route }) => {
         </View>
     );
 
-    const buyBuilding = async (type) => {
-        try {
-            const res = await api.post(`/city/buy/${userId}/${type}`);
-            if (res.data.success) {
-                Alert.alert("Success", `Bought ${BUILDING_TYPES[type].label}!`);
-                setShopVisible(false);
-                fetchData(); // Refresh data
-            }
-        } catch (err) {
-            Alert.alert("Error", err.response?.data?.detail || "Purchase failed");
-        }
-    };
-
-    const upgradeBuilding = async (building) => {
-        try {
-            const res = await api.post(`/city/upgrade/${userId}/${building.id}`);
-            if (res.data.success) {
-                Alert.alert("Success", res.data.message);
-                setSelectedBuilding(null);
-                fetchData();
-            }
-        } catch (err) {
-            Alert.alert("Error", err.response?.data?.detail || "Upgrade failed");
-        }
-    };
-
-    if (loading) return (
-        <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={COMMON_STYLES.text}>Loading City Plan...</Text>
-        </View>
-    );
-
     if (!cityState) return (
         <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
             <Text style={COMMON_STYLES.text}>City not founded yet.</Text>
         </View>
     );
 
-    const { level, unlocked_rings } = cityState;
-    const coreRadius = 60;
-    const ringStep = 50;
+    const { level = 1, unlocked_rings = 1 } = cityState || {};
 
-    const renderBuilding = (b, index, total, radius) => {
-        const angle = (360 / total) * index;
-        const imageSource = BUILDING_TYPES[b.building_type]?.image;
-
-        const style = {
-            position: 'absolute',
-            width: 32, // Increased size for better visibility
-            height: 32,
-            transform: [
-                { rotate: `${angle}deg` },
-                { translateY: -radius }
-            ],
-            // Removed borderRadius as we are using transparent PNGs
-        };
-
-        const content = imageSource ? (
-            <Image
-                source={imageSource}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="contain"
-            />
-        ) : (
-            <View style={{ width: '100%', height: '100%', backgroundColor: '#ccc' }} />
-        );
+    const renderBuilding = (building, index, capacity, radius) => {
+        // Calculate angle: 360 / capacity * index
+        // Start from -90 deg (top) or 0 deg (right)
+        const angle = (360 / capacity) * index;
+        const typeConfig = BUILDING_TYPES[building.building_type];
 
         return (
-            <TouchableOpacity key={b.id} style={style} onPress={() => setSelectedBuilding(b)}>
-                {content}
-                {/* Level Badge */}
-                <View style={styles.levelBadge}>
-                    <Text style={styles.levelText}>{b.level || 1}</Text>
-                </View>
-            </TouchableOpacity>
+            <View key={building.id} style={{
+                position: 'absolute',
+                width: 40,
+                height: 40,
+                justifyContent: 'center',
+                alignItems: 'center',
+                transform: [
+                    { rotate: `${angle}deg` },
+                    { translateY: -radius }, // Push out to ring radius
+                    { rotate: `-${angle}deg` } // Rotate back to be upright
+                ],
+            }}>
+                <TouchableOpacity onPress={() => setSelectedBuilding(building)}>
+                    <Image
+                        source={typeConfig?.image}
+                        style={{ width: 30, height: 30, resizeMode: 'contain' }}
+                    />
+                    {/* Optional: Level Badge */}
+                    <View style={{
+                        position: 'absolute',
+                        bottom: -5,
+                        right: -5,
+                        backgroundColor: COLORS.primary,
+                        borderRadius: 10,
+                        width: 16,
+                        height: 16,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{building.level}</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
         );
     };
 
-    // Distribute buildings: 0-4 inner, 5+ outer (Simple visualization logic)
-    const innerBuildings = buildings.slice(0, 8);
-    const outerBuildings = buildings.slice(8);
+    // Dynamic Ring Generation
+    const rings = [];
+    const ringStep = 42; // Reduced by 30% (was 60)
+    const coreRadius = 75;
+
+    // Distribute buildings into rings
+    // Ensure buildings is an array
+    const safeBuildings = Array.isArray(buildings) ? buildings : [];
+    let remainingBuildings = [...safeBuildings];
+
+    // Safety clamp for unlocked_rings to prevent infinite loops or huge memory usage
+    const safeUnlockedRings = Math.max(1, Math.min(unlocked_rings || 1, 50));
+
+    for (let i = 1; i <= safeUnlockedRings; i++) {
+        const capacity = 8 + (i - 1) * 4; // 8, 12, 16...
+        const ringBuildings = remainingBuildings.splice(0, capacity);
+        rings.push({
+            id: i,
+            radius: coreRadius + ringStep * i,
+            buildings: ringBuildings,
+            capacity: capacity
+        });
+    }
+
+    // If there are still remaining buildings, put them in the last ring
+    if (remainingBuildings.length > 0 && rings.length > 0) {
+        rings[rings.length - 1].buildings.push(...remainingBuildings);
+    }
+
+
+    const maxRingRadius = coreRadius + ringStep * safeUnlockedRings;
 
     return (
         <View style={COMMON_STYLES.container}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, zIndex: 100 }}>
                 <Text style={COMMON_STYLES.header}>Cyber City</Text>
                 <TouchableOpacity onPress={() => setShopVisible(true)} style={{ backgroundColor: COLORS.gold, padding: 8, borderRadius: 8 }}>
                     <Text style={{ color: COLORS.black, fontWeight: 'bold' }}>Construction 🏗️</Text>
@@ -223,31 +314,51 @@ const CityMapScreen = ({ navigation, route }) => {
                 Level {level} • Population {cityState.population}
             </Text>
 
-            <View style={styles.mapContainer}>
-                {/* District 2 (Outer Ring) */}
-                {unlocked_rings >= 2 && (
-                    <View style={[styles.ring, { width: (coreRadius + ringStep * 2) * 2, height: (coreRadius + ringStep * 2) * 2, borderColor: '#444' }]}>
-                        {outerBuildings.map((b, i) => renderBuilding(b, i, Math.max(8, outerBuildings.length), coreRadius + ringStep * 2))}
-                    </View>
-                )}
+            <View style={[styles.mapContainer, { paddingBottom: 60 }]}>
 
-                {/* District 1 (Inner Ring) */}
-                {unlocked_rings >= 1 && (
-                    <View style={[styles.ring, { width: (coreRadius + ringStep) * 2, height: (coreRadius + ringStep) * 2, borderColor: '#555' }]}>
-                        {innerBuildings.map((b, i) => renderBuilding(b, i, Math.max(8, innerBuildings.length), coreRadius + ringStep))}
+                {/* Dynamically Render Rings (Outer to Inner for stacking context if needed, but absolute positioning handles it) */}
+                {/* Actually reverse map might be better for z-index if they overlap, but rings are concentric. */}
+                {rings.map(ring => (
+                    <View key={ring.id} style={[styles.ring, { width: ring.radius * 2, height: ring.radius * 2, borderColor: '#444' }]}>
+                        {ring.buildings.map((b, i) => renderBuilding(b, i, Math.max(ring.capacity, ring.buildings.length), ring.radius))}
                     </View>
-                )}
+                ))}
+
+
+                {/* Outer Wall */}
+                {/* Wall scaled relative to max unlocked ring */}
+                <Animated.View style={[
+                    styles.ring,
+                    {
+                        width: (maxRingRadius + 10) * 2,
+                        height: (maxRingRadius + 10) * 2,
+                        borderColor: wallBorderColor, // Animated Color
+                        borderWidth: 4,
+                        borderStyle: 'dashed', // Cyber look
+                        opacity: 0.8,
+                        shadowColor: wallShadowColor, // Animated Shadow
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 10,
+                        elevation: 5
+                    }
+                ]} />
 
                 {/* Population Layer */}
-                <PopulationLayer population={cityState.population} maxRadius={coreRadius + ringStep * unlocked_rings} minRadius={coreRadius} />
+                <PopulationLayer population={cityState.population} maxRadius={maxRingRadius - 15} minRadius={coreRadius + 10} />
 
                 {/* Core */}
                 <View style={[styles.core, { width: coreRadius * 2, height: coreRadius * 2 }]}>
                     <View style={styles.coreInner} />
                 </View>
+
+                {/* Billboards */}
+                {cityState.population > 100 && (
+                    <Billboard angle={45} radius={110} />
+                )}
             </View>
 
-            <View style={{ padding: 20 }}>
+            <View style={{ padding: 20, zIndex: 100, backgroundColor: 'rgba(0,0,0,0.8)' }}>
                 <TouchableOpacity
                     style={[COMMON_STYLES.buttonPrimary, { backgroundColor: '#4CAF50', borderWidth: 0 }]}
                     onPress={() => navigation.goBack()}

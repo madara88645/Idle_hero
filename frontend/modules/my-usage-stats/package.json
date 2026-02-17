@@ -1,0 +1,8 @@
+{
+    "name": "my-usage-stats",
+    "version": "1.0.0",
+    "main": "index.ts",
+    "dependencies": {
+        "expo-modules-core": "~2.1.1"
+    }
+}

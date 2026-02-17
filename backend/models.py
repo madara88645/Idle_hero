@@ -32,10 +32,19 @@ class User(Base):
     stats = relationship("CharacterStats", back_populates="user", uselist=False)
     rules = relationship("DetoxRule", back_populates="user")
     logs = relationship("UsageLog", back_populates="user")
+    
+    # Hybrid Integration: All Relationships
     unlocked_skills = relationship("UnlockedSkill", back_populates="user")
     boss_enemies = relationship("BossEnemy", back_populates="user")
-    kingdom = relationship("Kingdom", back_populates="user", uselist=False)
     quests = relationship("UserQuest", back_populates="user")
+    
+    # Friend's City Features
+    city_state = relationship("CityState", back_populates="user", uselist=False)
+    buildings = relationship("UserBuilding", back_populates="user")
+    
+    # Legacy Kingdom (Deprecated in favor of CityState, but kept for compatibility if needed)
+    kingdom = relationship("Kingdom", back_populates="user", uselist=False)
+
 
 class CharacterStats(Base):
     __tablename__ = "character_stats"
@@ -50,12 +59,18 @@ class CharacterStats(Base):
     energy = Column(Integer, default=100)
     willpower = Column(Integer, default=10)
     
-    # Combat stats for Boss Battle
+    # COMBAT STATS (For Boss Battles)
     attack_power = Column(Integer, default=5)   # Damage per focus minute
     defense = Column(Integer, default=2)        # Damage reduction
     health = Column(Integer, default=100)       # Player health
     max_health = Column(Integer, default=100)   # Max health cap
-    gold = Column(Integer, default=0)           # Currency
+    
+    # ECONOMY (Hybrid)
+    gold = Column(Integer, default=0)           # Currency (Shared)
+    diamond = Column(Integer, default=0)        # Premium (Friend)
+    bronze = Column(Integer, default=0)         # Basic (Friend)
+    
+    last_sync_time = Column(DateTime(timezone=True), server_default=func.now())
     
     # Class system
     class_id = Column(String, ForeignKey("hero_classes.id"), nullable=True)
@@ -119,34 +134,31 @@ class BossEnemy(Base):
     user = relationship("User", back_populates="boss_enemies")
 
 
-class Kingdom(Base):
-    """Kingdom for resource management system."""
-    __tablename__ = "kingdoms"
+# --- CITY BUILDER SYSTEM (Friend's Additions) ---
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), unique=True)
+class CityState(Base):
+    __tablename__ = "city_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"))
     
-    name = Column(String, default="My Kingdom")
-    wood = Column(Integer, default=0)
-    stone = Column(Integer, default=0)
-    gold = Column(Integer, default=0)
-
-    user = relationship("User", back_populates="kingdom")
-    buildings = relationship("Building", back_populates="kingdom")
-
-
-class Building(Base):
-    """Buildings within a Kingdom."""
-    __tablename__ = "buildings"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    kingdom_id = Column(String, ForeignKey("kingdoms.id"))
-    
-    type = Column(String, index=True)  # "Library", "Barracks", "Mine"
     level = Column(Integer, default=1)
-    health = Column(Integer, default=100)  # 0-100%
+    unlocked_rings = Column(Integer, default=1) # 1 = Core only, 2 = Core + 1st ring, etc.
+    population = Column(Integer, default=0)
+    
+    user = relationship("User", back_populates="city_state")
 
-    kingdom = relationship("Kingdom", back_populates="buildings")
+class UserBuilding(Base):
+    __tablename__ = "user_buildings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    
+    building_type = Column(String) # mine, town_hall, etc.
+    level = Column(Integer, default=1)
+    purchased_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    user = relationship("User", back_populates="buildings")
 
 
 # --- QUEST SYSTEM ---
@@ -191,6 +203,33 @@ class UserQuest(Base):
     user = relationship("User", back_populates="quests")
     definition = relationship("QuestDefinition")
 
-# Add relation to User class manually or via back_populates
-# We need to update User class to include 'quests' relationship
 
+# --- DEPRECATED/COMPATIBILITY ---
+class Kingdom(Base):
+    """Kingdom for resource management system. Deprecated in favor of CityState."""
+    __tablename__ = "kingdoms"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), unique=True)
+    
+    name = Column(String, default="My Kingdom")
+    wood = Column(Integer, default=0)
+    stone = Column(Integer, default=0)
+    gold = Column(Integer, default=0)
+
+    user = relationship("User", back_populates="kingdom")
+    buildings = relationship("Building", back_populates="kingdom")
+
+
+class Building(Base):
+    """Buildings within a Kingdom. Deprecated."""
+    __tablename__ = "buildings"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    kingdom_id = Column(String, ForeignKey("kingdoms.id"))
+    
+    type = Column(String, index=True)  # "Library", "Barracks", "Mine"
+    level = Column(Integer, default=1)
+    health = Column(Integer, default=100)  # 0-100%
+
+    kingdom = relationship("Kingdom", back_populates="buildings")

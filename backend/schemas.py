@@ -14,7 +14,7 @@ class User(UserBase):
     id: str
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Hero Class Schemas
 class HeroClassBase(BaseModel):
@@ -25,7 +25,7 @@ class HeroClassBase(BaseModel):
 class HeroClass(HeroClassBase):
     id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ClassSelectRequest(BaseModel):
     class_id: str
@@ -38,12 +38,18 @@ class CharacterStats(BaseModel):
     discipline: int
     energy: int
     willpower: int
+    
+    # Hybrid Fields
     gold: int = 0
+    diamond: int = 0
+    bronze: int = 0
+    
     class_id: Optional[str] = None
     skill_points: int = 0
     hero_class: Optional["HeroClass"] = None
+    
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Skill Schemas
 class Skill(BaseModel):
@@ -74,7 +80,7 @@ class DetoxRule(DetoxRuleBase):
     id: str
     user_id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Usage Log Schemas
 class UsageLogCreate(BaseModel):
@@ -83,18 +89,25 @@ class UsageLogCreate(BaseModel):
     end_time: datetime
     duration_seconds: int
 
-class SyncResponse(BaseModel):
-    xp_gained: int
-    level_up: bool
-    new_stats: CharacterStats
-    insight: Optional[str] = None
+# City Schemas (Friend's)
+class CityStateBase(BaseModel):
+    level: int
+    unlocked_rings: int
+    population: int
 
-class UserProfile(User):
-    stats: Optional[CharacterStats] = None
-    rules: List[DetoxRule] = []
+class CityState(CityStateBase):
+    class Config:
+        from_attributes = True
 
+class UserBuilding(BaseModel):
+    id: int
+    building_type: str
+    level: int
+    purchased_at: datetime
+    class Config:
+        from_attributes = True
 
-# Boss Battle Schemas
+# Boss & Battle Schemas (Mine)
 class BossStatus(BaseModel):
     """Current boss status for GET /game/boss"""
     id: str
@@ -104,8 +117,7 @@ class BossStatus(BaseModel):
     damage_dealt_to_user: int
     is_defeated: bool
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 class BattleSummary(BaseModel):
     """Battle result summary included in sync response"""
@@ -117,61 +129,18 @@ class BattleSummary(BaseModel):
     xp_gained: int
     level_up: bool
     boss_name: str
+    xp_reward: int # Bonus from boss kill
 
 
-class SyncResponseWithBattle(BaseModel):
-    """Extended sync response with battle summary"""
+# Sync Response (Hybrid)
+class SyncResponse(BaseModel):
     xp_gained: int
     level_up: bool
     new_stats: CharacterStats
     insight: Optional[str] = None
-    battle: Optional[BattleSummary] = None
+    battle: Optional[BattleSummary] = None # Optional boss battle info
 
-
-# Kingdom Schemas
-class Building(BaseModel):
-    id: str
-    type: str
-    level: int
-    health: int
-    class Config:
-        orm_mode = True
-
-
-class Kingdom(BaseModel):
-    id: str
-    name: str
-    wood: int
-    stone: int
-    gold: int
-    buildings: List[Building] = []
-    class Config:
-        orm_mode = True
-
-
-class BuildRequest(BaseModel):
-    building_type: str
-
-
-class KingdomSyncResult(BaseModel):
-    wood_gained: int
-    stone_gained: int
-    disaster_occurred: bool
-    damaged_building: Optional[str] = None
-
-
-class SyncResponseWithKingdom(BaseModel):
-    """Extended sync response with kingdom resources"""
-    xp_gained: int
-    level_up: bool
-    new_stats: CharacterStats
-    insight: Optional[str] = None
-    battle: Optional[BattleSummary] = None
-    kingdom: Optional[KingdomSyncResult] = None
-
-
-# --- QUEST SCHEMAS ---
-
+# Quest Schemas
 class QuestDefinition(BaseModel):
     id: str
     code: str
@@ -191,5 +160,41 @@ class UserQuest(BaseModel):
     current_progress: int
     definition: QuestDefinition
 
+    class Config:
+        from_attributes = True
+
+# Kingdom Schemas (Legacy/Deprecated but kept for safety)
+class Building(BaseModel):
+    id: str
+    type: str
+    level: int
+    health: int
+    class Config:
+        from_attributes = True
+
+class Kingdom(BaseModel):
+    id: str
+    name: str
+    wood: int
+    stone: int
+    gold: int
+    buildings: List[Building] = []
+    class Config:
+        from_attributes = True
+
+class KingdomSyncResult(BaseModel):
+    wood_gained: int
+    stone_gained: int
+    disaster_occurred: bool
+    damaged_building: Optional[str] = None
+
+# User Profile (Aggregated)
+class UserProfile(User):
+    stats: Optional[CharacterStats] = None
+    city_state: Optional[CityState] = None
+    rules: List[DetoxRule] = []
+    quests: List[UserQuest] = []
+    buildings: List[UserBuilding] = []
+    
     class Config:
         from_attributes = True

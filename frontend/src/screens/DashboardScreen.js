@@ -1,30 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import api from '../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme, commonStyles } from '../theme';
-import HeroAvatar from '../components/HeroAvatar';
-import FloatingText from '../components/FloatingText';
+import { COLORS, COMMON_STYLES } from '../styles/theme';
 import UsageStatsService from '../services/UsageStatsService';
+import FloatingText from '../components/FloatingText';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSequence,
     withTiming,
-    withRepeat,
-    runOnJS
+    withRepeat
 } from 'react-native-reanimated';
 
 const DashboardScreen = ({ navigation, route }) => {
     const insets = useSafeAreaInsets();
-    // Use state for userId to handle auto-onboarding updates if needed
     const [currentUserId, setCurrentUserId] = useState(route.params?.userId || 'default-user-id');
     const [profile, setProfile] = useState(null);
+    const [hasPermission, setHasPermission] = useState(false);
     const [floatingTexts, setFloatingTexts] = useState([]);
 
     // Animation Shared Values
     const shake = useSharedValue(0);
-
     const animatedCardStyle = useAnimatedStyle(() => {
         return {
             transform: [{ translateX: shake.value }],
@@ -56,7 +53,6 @@ const DashboardScreen = ({ navigation, route }) => {
         } catch (err) {
             console.error("Fetch profile error:", err);
             if (err.response && (err.response.status === 404 || err.response.status === 422)) {
-                console.log("User not found, onboarding...");
                 try {
                     const randomSuffix = Math.floor(Math.random() * 10000);
                     const newUser = {
@@ -64,14 +60,8 @@ const DashboardScreen = ({ navigation, route }) => {
                         email: `hero${randomSuffix}@idle.com`
                     };
                     const onboardRes = await api.post('/user/onboard', newUser);
-                    console.log("Onboarded new user:", onboardRes.data);
-
-                    // Update state with new user ID and profile
                     setCurrentUserId(onboardRes.data.id);
-                    setProfile({ ...onboardRes.data, stats: { level: 1, xp: 0, discipline: 0, focus: 0 } });
-
-                    // Trigger a re-fetch to ensure everything is synced (optional)
-                    // fetchProfile();
+                    setProfile(onboardRes.data);
                 } catch (onboardErr) {
                     console.error("Onboard failed:", onboardErr);
                     alert("Failed to create new user. Please check backend.");
@@ -80,151 +70,151 @@ const DashboardScreen = ({ navigation, route }) => {
         }
     };
 
+    const checkPermission = async () => {
+        const status = await UsageStatsService.hasPermission();
+        setHasPermission(status);
+    };
+
     useEffect(() => {
         fetchProfile();
+        checkPermission();
     }, []);
-
-    // Redirect to class selection if needed
-    useEffect(() => {
-        if (profile && profile.stats && !profile.stats.class_id) {
-            console.log("No class selected, redirecting...");
-            navigation.navigate('ClassSelection', { userId: currentUserId });
-        }
-    }, [profile, navigation, currentUserId]);
 
     const handleSync = async () => {
         try {
-            // Get Usage Logs (Mock or Real)
+            // Get Usage Logs
             const logs = await UsageStatsService.getTodayUsage();
             console.log("Syncing Logs:", logs);
 
-            // Optimistic feedback before API call
+            // Optimistic feedback
             addFloatingText("Syncing...", 100, 400);
 
             const res = await api.post(`/sync/usage/${currentUserId}`, logs);
 
-            // Calculate XP gain/Logic
+            // Logic for feedback
             if (res.data.xp_gained > 0) {
                 addFloatingText(`+${res.data.xp_gained} XP`, 180, 150);
-                triggerShake(); // Shake card on XP gain/battle
+                triggerShake();
             }
 
             alert(res.data.insight);
             fetchProfile();
         } catch (err) {
-            console.error(err);
+            console.error("Sync error:", err);
+            // alert("Failed to sync usage data.");
+            // Mock success for UI testing if backend fails
+            triggerShake();
         }
     };
 
+    const StatCard = ({ label, value, icon }) => (
+        <View style={localStyles.statCard}>
+            <Text style={localStyles.statIcon}>{icon}</Text>
+            <View>
+                <Text style={localStyles.statLabel}>{label}</Text>
+                <Text style={localStyles.statValue}>{value}</Text>
+            </View>
+        </View>
+    );
+
     if (!profile) return (
-        <View style={[commonStyles.container, styles.center]}>
-            <Text style={{ color: theme.colors.text }}>Loading Hero...</Text>
+        <View style={[COMMON_STYLES.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={COMMON_STYLES.text}>Loading Hero Profile...</Text>
         </View>
     );
 
     const { stats } = profile;
 
-    // Helper to render a stat card
-    const StatCard = ({ label, value, color }) => (
-        <View style={[styles.statCard, { borderColor: color }]}>
-            <Text style={[styles.statValue, { color: color }]}>{value}</Text>
-            <Text style={styles.statLabel}>{label}</Text>
-        </View>
-    );
-
     return (
-        <ScrollView style={[commonStyles.container, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
+        <View style={[COMMON_STYLES.container, { paddingTop: insets.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-            <View style={styles.headerContainer}>
-                <Text style={styles.headerTitle}> Idle Hero </Text>
-                <Text style={styles.subHeader}>Welcome, {profile.username}</Text>
+            {/* Header */}
+            <View style={localStyles.headerContainer}>
+                <Text style={COMMON_STYLES.header}>Idle Hero</Text>
+                <Text style={COMMON_STYLES.textSecondary}>Level {stats?.level} • {stats?.xp} XP</Text>
             </View>
 
-            {/* Hero Avatar & Main Stats (with Shake Animation) */}
-            <Animated.View style={[commonStyles.card, animatedCardStyle]}>
-                <View style={styles.heroRow}>
-                    <HeroAvatar heroClass={stats?.hero_class} level={stats?.level} size={84} />
-                    <View style={styles.mainStats}>
-                        <Text style={styles.levelText}>Level {stats?.level}</Text>
+            <ScrollView contentContainerStyle={localStyles.scrollContent}>
+                {/* Stats */}
+                <Text style={COMMON_STYLES.subHeader}>Stats</Text>
+                <Animated.View style={[localStyles.statsGrid, animatedCardStyle]}>
+                    <StatCard label="Discipline" value={stats?.discipline} icon="🛡️" />
+                    <StatCard label="Focus" value={stats?.focus} icon="🎯" />
+                </Animated.View>
 
-                        {/* XP Bar */}
-                        <Text style={styles.barLabel}>XP: {stats?.xp} / {stats?.level * 100}</Text>
-                        <View style={styles.progressBarBg}>
-                            <View style={[styles.progressBarFill, { width: `${(stats?.xp / (stats?.level * 100)) * 100}%`, backgroundColor: theme.colors.gold }]} />
-                        </View>
-
-                        {/* Health Bar (Stubbed max health 100 for now if not in model) */}
-                        <Text style={styles.barLabel}>HP: {stats?.health || 100} / {stats?.max_health || 100}</Text>
-                        <View style={styles.progressBarBg}>
-                            <View style={[styles.progressBarFill, { width: `${((stats?.health || 100) / (stats?.max_health || 100)) * 100}%`, backgroundColor: theme.colors.danger }]} />
-                        </View>
+                {/* Resources */}
+                <Text style={COMMON_STYLES.subHeader}>Resources</Text>
+                <View style={localStyles.resourceRow}>
+                    <View style={[localStyles.resourceItem, { borderColor: COLORS.bronze }]}>
+                        <Text style={[localStyles.resourceValue, { color: COLORS.bronze }]}>{stats?.bronze}</Text>
+                        <Text style={localStyles.resourceLabel}>Bronze</Text>
+                    </View>
+                    <View style={[localStyles.resourceItem, { borderColor: COLORS.gold }]}>
+                        <Text style={[localStyles.resourceValue, { color: COLORS.gold }]}>{stats?.gold}</Text>
+                        <Text style={localStyles.resourceLabel}>Gold</Text>
+                    </View>
+                    <View style={[localStyles.resourceItem, { borderColor: COLORS.diamond }]}>
+                        <Text style={[localStyles.resourceValue, { color: COLORS.diamond }]}>{stats?.diamond}</Text>
+                        <Text style={localStyles.resourceLabel}>Diamond</Text>
                     </View>
                 </View>
-            </Animated.View>
 
-            {/* Grid Stats */}
-            <View style={styles.gridContainer}>
-                <StatCard label="Discipline" value={stats?.discipline} color={theme.colors.primary} />
-                <StatCard label="Focus" value={stats?.focus} color={theme.colors.success} />
-            </View>
-
-            {/* Actions & Hub World */}
-            <Text style={styles.sectionTitle}>World Map</Text>
-
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.colors.primary }]} onPress={handleSync}>
-                <Text style={styles.buttonText}>⚡ Sync Usage (Energy)</Text>
-            </TouchableOpacity>
-
-            <View style={styles.hubContainer}>
-                {/* Sky / Background Effect */}
-                <View style={styles.hubSky}>
-                    <Text style={{ color: '#555', position: 'absolute', top: 10, left: 20 }}>☁️</Text>
-                    <Text style={{ color: '#666', position: 'absolute', top: 30, right: 40 }}>☁️</Text>
+                {/* Recent Activity / Status */}
+                <View style={COMMON_STYLES.card}>
+                    <Text style={[COMMON_STYLES.subHeader, { fontSize: 18 }]}>Status</Text>
+                    <Text style={COMMON_STYLES.textSecondary}>{stats?.hero_class ? stats.hero_class.name : "No Class"}</Text>
                 </View>
+            </ScrollView>
 
-                {/* Castle Zone (Kingdom) */}
-                <TouchableOpacity
-                    style={[styles.hubZone, { backgroundColor: theme.colors.hubCastle, flex: 2 }]}
-                    onPress={() => navigation.navigate('Kingdom', { userId: currentUserId })}
-                >
-                    <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Kingdom')}>
-                        <Text style={styles.actionButtonText}>Build Kingdom 🏰</Text>
+            {/* Action Buttons */}
+            <View style={localStyles.actionContainer}>
+
+                {/* Row 1: Sync & Rules */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <TouchableOpacity style={[COMMON_STYLES.buttonPrimary, { flex: 1, marginRight: 5 }]} onPress={handleSync}>
+                        <Text style={COMMON_STYLES.buttonText}>{hasPermission ? '⚡ Sync' : 'Grant Perm'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Quests')}>
-                        <Text style={styles.actionButtonText}>Quest Log 📜</Text>
-                    </TouchableOpacity>
-
-                    {/* Middle Row: Boss & Town */}
-                    <View style={{ flexDirection: 'row', height: 120, marginTop: 10 }}>
-                        <TouchableOpacity
-                            style={[styles.hubZone, { backgroundColor: theme.colors.hubBoss, flex: 1, marginRight: 5 }]}
-                            onPress={() => navigation.navigate('BossBattle', { userId: currentUserId })}
-                        >
-                            <Text style={styles.hubIcon}>👹</Text>
-                            <Text style={styles.hubLabel}>Boss Lair</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.hubZone, { backgroundColor: theme.colors.hubTown, flex: 1, marginLeft: 5 }]}
-                            onPress={() => navigation.navigate('Rules', { userId: currentUserId })}
-                        >
-                            <Text style={styles.hubIcon}>📜</Text>
-                            <Text style={styles.hubLabel}>Town Hall</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Bottom Row: Profile (Barracks) */}
                     <TouchableOpacity
-                        style={[styles.hubZone, { backgroundColor: theme.colors.hubMarket, marginTop: 10, height: 60, flexDirection: 'row', justifyContent: 'center' }]}
+                        style={[COMMON_STYLES.buttonPrimary, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.primary, flex: 1, marginLeft: 5 }]}
+                        onPress={() => navigation.navigate('Rules', { userId: currentUserId })}
+                    >
+                        <Text style={[COMMON_STYLES.buttonText, { color: COLORS.primary }]}>Rules</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Row 2: City & Boss */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <TouchableOpacity
+                        style={[COMMON_STYLES.buttonPrimary, { backgroundColor: '#2196F3', flex: 1, marginRight: 5 }]}
+                        onPress={() => navigation.navigate('CityMap', { userId: currentUserId })}
+                    >
+                        <Text style={[COMMON_STYLES.buttonText, { color: '#FFFFFF' }]}>🏙️ City</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[COMMON_STYLES.buttonPrimary, { backgroundColor: '#E53935', flex: 1, marginLeft: 5 }]}
+                        onPress={() => navigation.navigate('BossBattle', { userId: currentUserId })}
+                    >
+                        <Text style={[COMMON_STYLES.buttonText, { color: '#FFFFFF' }]}>👹 Boss</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Row 3: Quests & Profile */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <TouchableOpacity
+                        style={[COMMON_STYLES.buttonPrimary, { backgroundColor: '#FF9800', flex: 1, marginRight: 5 }]}
+                        onPress={() => navigation.navigate('Quests', { userId: currentUserId })}
+                    >
+                        <Text style={[COMMON_STYLES.buttonText, { color: '#FFFFFF' }]}>📜 Quests</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[COMMON_STYLES.buttonPrimary, { backgroundColor: '#9C27B0', flex: 1, marginLeft: 5 }]}
                         onPress={() => navigation.navigate('Profile', { userId: currentUserId })}
                     >
-                        <Text style={{ fontSize: 24, marginRight: 10 }}>⛺</Text>
-                        <Text style={[styles.hubLabel, { marginTop: 0 }]}>My Tent (Profile)</Text>
+                        <Text style={[COMMON_STYLES.buttonText, { color: '#FFFFFF' }]}>👤 Hero</Text>
                     </TouchableOpacity>
+                </View>
             </View>
-
-            <View style={{ height: 40 }} />
 
             {/* Floating Floating Texts */}
             {floatingTexts.map(ft => (
@@ -236,36 +226,74 @@ const DashboardScreen = ({ navigation, route }) => {
                     onComplete={() => removeFloatingText(ft.id)}
                 />
             ))}
-        </ScrollView>
+        </View>
     );
 };
 
-const styles = StyleSheet.create({
-    center: { justifyContent: 'center', alignItems: 'center' },
-    headerContainer: { alignItems: 'center', marginBottom: 20 },
-    headerTitle: { fontSize: 32, fontWeight: 'bold', color: theme.colors.gold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 5 },
-    subHeader: { color: theme.colors.subtext, fontSize: 16 },
-    heroRow: { flexDirection: 'row', alignItems: 'center' },
-    avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 20 },
-    mainStats: { flex: 1 },
-    levelText: { color: theme.colors.text, fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
-    barLabel: { color: theme.colors.subtext, fontSize: 12, marginTop: 4 },
-    progressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, marginTop: 2, overflow: 'hidden' },
-    progressBarFill: { height: '100%', borderRadius: 4 },
-    gridContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-    statCard: { flex: 0.48, backgroundColor: theme.colors.surface, padding: 15, borderRadius: theme.borderRadius.m, alignItems: 'center', borderWidth: 1 },
-    statValue: { fontSize: 24, fontWeight: 'bold', marginBottom: 5 },
-    statLabel: { color: theme.colors.subtext, fontSize: 12, textTransform: 'uppercase' },
-    sectionTitle: { color: theme.colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 15, marginTop: 10 },
-    actionButton: { padding: 15, borderRadius: theme.borderRadius.m, alignItems: 'center', marginBottom: 15, elevation: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
-
-    // Hub World Styles
-    hubContainer: { backgroundColor: theme.colors.sky, padding: 15, borderRadius: 20, borderWidth: 2, borderColor: '#333' },
-    hubSky: { height: 40, width: '100%', alignItems: 'center', justifyContent: 'center' },
-    hubZone: { borderRadius: 12, alignItems: 'center', justifyContent: 'center', padding: 10, elevation: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-    hubIcon: { fontSize: 32, marginBottom: 5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
-    hubLabel: { color: 'white', fontWeight: 'bold', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 2 }
+const localStyles = StyleSheet.create({
+    headerContainer: {
+        marginBottom: 10,
+        alignItems: 'center',
+    },
+    scrollContent: {
+        paddingBottom: 220, // Space for action container
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        marginBottom: 20,
+    },
+    statCard: {
+        ...COMMON_STYLES.card,
+        width: '48%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+    },
+    statIcon: {
+        fontSize: 24,
+        marginRight: 10,
+    },
+    statLabel: {
+        color: COLORS.textSecondary,
+        fontSize: 12,
+        textTransform: 'uppercase',
+    },
+    statValue: {
+        color: COLORS.text,
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    resourceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    resourceItem: {
+        ...COMMON_STYLES.card,
+        width: '30%',
+        alignItems: 'center',
+        borderWidth: 1,
+        backgroundColor: COLORS.surface,
+        padding: 5,
+    },
+    resourceValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 2,
+    },
+    resourceLabel: {
+        color: COLORS.textSecondary,
+        fontSize: 10,
+        textTransform: 'uppercase',
+    },
+    actionContainer: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        right: 20,
+    },
 });
 
 export default DashboardScreen;

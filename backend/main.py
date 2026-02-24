@@ -305,9 +305,25 @@ def get_user_quests(user_id: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
-    # Seed logic inline to avoid cyclic imports if possible, or call helper
-    # For now, simplistic:
-    return user.quests 
+    # Seed quest definitions if not present
+    if db.query(models.QuestDefinition).count() == 0:
+        db.add_all([
+            models.QuestDefinition(code="DAILY_SYNC", title="First Step", target_progress=1, reward_xp=50, reward_gold=100),
+            models.QuestDefinition(code="BOSS_SLAYER", title="Boss Slayer", target_progress=1, reward_xp=200, reward_gold=250),
+            models.QuestDefinition(code="FOCUS_MASTER", title="Focus Master", target_progress=1, reward_xp=150, reward_gold=150)
+        ])
+        db.commit()
+
+    # Auto-create user quests if none exist
+    if not user.quests:
+        quest_defs = db.query(models.QuestDefinition).all()
+        for qd in quest_defs:
+            uq = models.UserQuest(user_id=user_id, quest_def_id=qd.id, current_progress=0, status=models.QuestStatus.IN_PROGRESS)
+            db.add(uq)
+        db.commit()
+        db.refresh(user)
+
+    return user.quests
 
 @app.post("/quests/claim/{quest_id}", response_model=schemas.UserQuest)
 def claim_quest_reward(quest_id: str, db: Session = Depends(get_db)):

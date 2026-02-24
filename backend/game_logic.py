@@ -116,6 +116,8 @@ def calculate_battle_outcome(stats: StatsModel, logs: list[UsageLogCreate], boss
         "player_hp_remaining": stats.health,
         "boss_defeated": boss_defeated,
         "xp_reward": xp_reward,
+        "xp_gained": 0,
+        "level_up": False,
         "boss_name": boss.name
     }
 
